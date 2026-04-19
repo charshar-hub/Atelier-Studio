@@ -7,6 +7,7 @@ import StyleKit from './components/StyleKit';
 import StyleComparison from './components/StyleComparison';
 import StyleMatchDialog from './components/StyleMatchDialog';
 import ExportModal from './components/ExportModal';
+import StructuredOutlineModal from './components/StructuredOutlineModal';
 import Dashboard from './components/Dashboard';
 import StudentPreview from './components/StudentPreview';
 import TeachMode from './components/TeachMode';
@@ -635,6 +636,8 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingCardsForId, setGeneratingCardsForId] = useState(null);
   const [isMatchingStyle, setIsMatchingStyle] = useState(false);
+  const [isStructuring, setIsStructuring] = useState(false);
+  const [structuredOutline, setStructuredOutline] = useState(null);
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
   const [pendingStyleMatch, setPendingStyleMatch] = useState(null);
   const [styleMatchDialogOpen, setStyleMatchDialogOpen] = useState(false);
@@ -1006,6 +1009,35 @@ export default function App() {
       recordChange('Generated a new lesson', '');
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleStructureLesson = async () => {
+    if (isStructuring) return;
+    const lesson = lessons.find((l) => l.id === selectedLessonId);
+    if (!lesson) return;
+    setIsStructuring(true);
+    try {
+      const resp = await fetch('/api/structureLesson', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          topic: lesson.title || '',
+          notes: lesson.summary || '',
+        }),
+      });
+      if (!resp.ok) {
+        const { error } = await resp.json().catch(() => ({}));
+        throw new Error(error || `Request failed: ${resp.status}`);
+      }
+      const data = await resp.json();
+      setStructuredOutline({ outline: data, lessonTitle: lesson.title || '' });
+      recordChange('Structured lesson outline', lesson.title || '');
+    } catch (err) {
+      console.error('Structure lesson failed:', err);
+      alert(`Could not structure lesson: ${err.message}`);
+    } finally {
+      setIsStructuring(false);
     }
   };
 
@@ -1936,10 +1968,12 @@ export default function App() {
               onGenerateLesson={handleGenerateLesson}
               onMatchStyle={handleMatchStyle}
               onAIAction={handleAIAction}
+              onStructureLesson={handleStructureLesson}
               styleProfile={styleProfile}
               canMatchStyle={selectedLessonId !== null}
               isGenerating={isGenerating}
               isMatchingStyle={isMatchingStyle}
+              isStructuring={isStructuring}
               inFlightAIActions={inFlightAIActions}
               lastChange={lastChange}
             />
@@ -1968,6 +2002,13 @@ export default function App() {
           courseMeta={exportCourseMeta}
           lessons={lessons}
           onClose={() => setIsExportOpen(false)}
+        />
+      )}
+      {structuredOutline && (
+        <StructuredOutlineModal
+          outline={structuredOutline.outline}
+          lessonTitle={structuredOutline.lessonTitle}
+          onClose={() => setStructuredOutline(null)}
         />
       )}
       {showOnboardingIntro && (

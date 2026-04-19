@@ -18,10 +18,12 @@ export default function AIPanel({
   onGenerateLesson,
   onMatchStyle,
   onAIAction,
+  onStructureLesson,
   styleProfile,
   canMatchStyle,
   isGenerating,
   isMatchingStyle,
+  isStructuring,
   inFlightAIActions,
   lastChange,
 }) {
@@ -29,6 +31,7 @@ export default function AIPanel({
 
   const handlers = {
     'g-lesson': onGenerateLesson,
+    'g-structure': onStructureLesson,
     'r-style': onMatchStyle,
   };
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
@@ -37,18 +40,21 @@ export default function AIPanel({
 
   const disabledKeys = new Set();
   if (!canMatchStyle) {
-    // Style/refine actions all target the selected lesson
+    // Style/refine actions and structure all target the selected lesson
     disabledKeys.add('r-style');
+    disabledKeys.add('g-structure');
     for (const key of Object.keys(ACTION_MODE_MAP)) disabledKeys.add(key);
   }
   if (isGenerating) disabledKeys.add('g-lesson');
   if (isMatchingStyle) disabledKeys.add('r-style');
+  if (isStructuring) disabledKeys.add('g-structure');
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
     if (inFlight.has(mode)) disabledKeys.add(key);
   }
 
   const labelOverrides = {
     'g-lesson': isGenerating ? 'Generating…' : undefined,
+    'g-structure': isStructuring ? 'Structuring…' : undefined,
     'r-style': isMatchingStyle ? 'Applying style…' : undefined,
   };
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
@@ -57,6 +63,7 @@ export default function AIPanel({
 
   const loadingKeySet = new Set();
   if (isGenerating) loadingKeySet.add('g-lesson');
+  if (isStructuring) loadingKeySet.add('g-structure');
   if (isMatchingStyle) loadingKeySet.add('r-style');
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
     if (inFlight.has(mode)) loadingKeySet.add(key);

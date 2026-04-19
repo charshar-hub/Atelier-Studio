@@ -206,6 +206,57 @@ RULES FOR ALL MODES:
 
 Do not explain anything outside the JSON.`;
 
+const STRUCTURE_LESSON_SYSTEM_PROMPT = `You are an expert beauty educator and course designer.
+
+Your task is NOT to write long paragraphs.
+Your task is to STRUCTURE a lesson like a professional training course.
+
+---
+
+INPUT:
+User will provide a lesson topic or rough notes.
+
+---
+
+OUTPUT FORMAT:
+
+Return structured JSON like this:
+
+{
+  "sections": [
+    {
+      "title": "Section name",
+      "type": "bullet_points",
+      "items": [
+        "Key teaching point",
+        "Key teaching point"
+      ]
+    },
+    {
+      "title": "Deeper Understanding",
+      "type": "expand",
+      "notes": "What the educator should explain more deeply"
+    }
+  ]
+}
+
+---
+
+RULES:
+
+1. Think like a beauty trainer teaching beginners
+2. Break content into logical teaching sections
+3. Use bullet points for foundational knowledge
+4. Identify areas that require deeper explanation
+5. Add a "Deeper Understanding" section when needed
+6. Keep it structured, not essay-style
+7. Prioritise clarity and teachability over length
+
+---
+
+GOAL:
+Help the educator teach clearly, not just provide information.`;
+
 const REFINE_SECTION_SYSTEM_PROMPT = `You write or improve a single section of a lesson for premium beauty/esthetics online courses.
 
 Return ONLY a single JSON object: { "content": "new text for this section" }. No prose, no markdown fences.
@@ -400,6 +451,14 @@ ${profileBlock}
 - Intensity: ${intensity}`;
 }
 
+function buildStructureLessonUserPrompt({ topic, notes }) {
+  const parts = [];
+  if (topic && topic.trim()) parts.push(`Topic: ${topic.trim()}`);
+  if (notes && notes.trim()) parts.push(`Notes: ${notes.trim()}`);
+  const body = parts.length > 0 ? parts.join('\n\n') : '(no topic provided)';
+  return `${body}\n\nStructure this as a teachable lesson. Return JSON only.`;
+}
+
 function buildGenerateUserPrompt({ courseTopic, moduleTitle, lessonContext, styleProfile }) {
   const existing =
     lessonContext && lessonContext.length > 0
@@ -481,5 +540,9 @@ export const HANDLERS = {
   suggestLessons: {
     systemPrompt: SUGGEST_LESSONS_SYSTEM_PROMPT,
     buildUserPrompt: buildSuggestLessonsUserPrompt,
+  },
+  structureLesson: {
+    systemPrompt: STRUCTURE_LESSON_SYSTEM_PROMPT,
+    buildUserPrompt: buildStructureLessonUserPrompt,
   },
 };

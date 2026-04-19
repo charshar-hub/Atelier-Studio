@@ -67,6 +67,7 @@ export const styleProfile = {
 export const generateActions = [
   { key: 'g-lesson', label: 'Generate full lesson', primary: true },
   { key: 'g-demo', label: 'Generate demo steps' },
+  { key: 'g-structure', label: 'Structure lesson' },
 ];
 
 export const refineActions = [
