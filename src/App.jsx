@@ -74,12 +74,20 @@ function makeModuleId() {
   return `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
+// Monotonic counter guarantees no ID collisions even inside a tight .map
+// loop where Date.now() returns the same millisecond for every call.
+let _idCounter = 0;
+function nextIdSuffix() {
+  _idCounter = (_idCounter + 1) % 1_000_000;
+  return `${Date.now()}-${_idCounter.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
 function makeBlockId() {
-  return `b-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  return `b-${nextIdSuffix()}`;
 }
 
 function makeItemId() {
-  return `i-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  return `i-${nextIdSuffix()}`;
 }
 
 const IMAGE_WIDTHS = ['small', 'medium', 'large', 'full'];
@@ -1229,7 +1237,7 @@ export default function App() {
   const handleInsertOutlineSection = (section) => {
     const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
     if (!targetLessonId) return;
-    const block = outlineSectionToBlock(section);
+    const [block] = normalizeInsertedBlocks([outlineSectionToBlock(section)]);
     setLessons((prev) =>
       prev.map((l) =>
         l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, block] } : l,
@@ -1237,6 +1245,49 @@ export default function App() {
     );
     scrollToBlock(block.id);
     recordChange('Inserted outline section', section?.title || '');
+  };
+
+  // Unconditional post-processing that runs on the full array of blocks about
+  // to be inserted into a lesson. Re-asserts the "every bullet has >= 1
+  // block" invariant so that even if the AI output / outlineSectionToBlock
+  // path ever slipped through a partial case, the state hitting setLessons
+  // is guaranteed consistent. Logs any self-repair so it's visible in dev.
+  const normalizeInsertedBlocks = (blocks) => {
+    let repaired = 0;
+    const out = blocks.map((b) => {
+      if (b?.type !== 'bullet_list') return b;
+      const items = Array.isArray(b.items) ? b.items : [];
+      const fixedItems = items.map((it) => {
+        const text =
+          typeof it?.text === 'string' && it.text.trim()
+            ? it.text
+            : typeof it?.title === 'string'
+              ? it.title
+              : '';
+        const existing = Array.isArray(it?.blocks) ? it.blocks : [];
+        if (existing.length > 0) {
+          return { id: it?.id || makeItemId(), text, blocks: existing };
+        }
+        repaired += 1;
+        return {
+          id: it?.id || makeItemId(),
+          text,
+          blocks: [
+            { id: makeBlockId(), type: 'text', content: text || '' },
+            { id: makeBlockId(), type: 'tip', content: '' },
+          ],
+        };
+      });
+      return { ...b, items: fixedItems };
+    });
+    if (repaired > 0) {
+      console.warn(
+        `[structureLesson] normalizeInsertedBlocks repaired ${repaired} bullet(s) with empty blocks`,
+      );
+    }
+    // Dev-only visibility into what landed in the lesson. Remove later.
+    console.log('[structureLesson] inserting blocks:', out);
+    return out;
   };
 
   // Collect the first N bullet item ids from a freshly-inserted set of blocks
@@ -1258,7 +1309,8 @@ export default function App() {
     const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
     const sections = structuredOutline?.outline?.sections;
     if (!targetLessonId || !Array.isArray(sections) || sections.length === 0) return;
-    const blocks = sections.map(outlineSectionToBlock);
+    console.log('[structureLesson] raw AI sections:', sections);
+    const blocks = normalizeInsertedBlocks(sections.map(outlineSectionToBlock));
     setLessons((prev) =>
       prev.map((l) =>
         l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, ...blocks] } : l,
@@ -1285,7 +1337,8 @@ export default function App() {
       'Replace this lesson\'s content with the structured outline? Existing sections will be removed.',
     );
     if (!confirmed) return;
-    const blocks = sections.map(outlineSectionToBlock);
+    console.log('[structureLesson] raw AI sections:', sections);
+    const blocks = normalizeInsertedBlocks(sections.map(outlineSectionToBlock));
     setLessons((prev) =>
       prev.map((l) => (l.id === targetLessonId ? { ...l, subBlocks: blocks } : l)),
     );
