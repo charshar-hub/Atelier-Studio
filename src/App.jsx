@@ -1290,17 +1290,17 @@ export default function App() {
     return out;
   };
 
-  // Collect the first N bullet item ids from a freshly-inserted set of blocks
-  // so we can auto-expand them in the UI.
-  const collectFirstBulletItemIds = (blocks, limit = 2) => {
+  // Collect every bullet item id from a freshly-inserted set of blocks so we
+  // can auto-expand them all in the UI. Previously we only expanded the first
+  // two of the first block, which made later sections look empty even though
+  // they had layered content — users weren't clicking the chevron to check.
+  const collectFirstBulletItemIds = (blocks) => {
     const ids = [];
     for (const b of blocks) {
       if (b.type !== 'bullet_list' || !Array.isArray(b.items)) continue;
       for (const it of b.items) {
-        if (ids.length >= limit) break;
         if (it?.id) ids.push(it.id);
       }
-      if (ids.length >= limit) break;
     }
     return ids;
   };
@@ -1316,7 +1316,7 @@ export default function App() {
         l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, ...blocks] } : l,
       ),
     );
-    const autoExpand = collectFirstBulletItemIds(blocks, 2);
+    const autoExpand = collectFirstBulletItemIds(blocks);
     if (autoExpand.length > 0) {
       setExpandedBulletIds((prev) => {
         const next = new Set(prev);
@@ -1342,7 +1342,7 @@ export default function App() {
     setLessons((prev) =>
       prev.map((l) => (l.id === targetLessonId ? { ...l, subBlocks: blocks } : l)),
     );
-    const autoExpand = collectFirstBulletItemIds(blocks, 2);
+    const autoExpand = collectFirstBulletItemIds(blocks);
     if (autoExpand.length > 0) {
       setExpandedBulletIds((prev) => {
         const next = new Set(prev);

@@ -1093,6 +1093,23 @@ function BulletItemRow({
         </div>
       </div>
 
+      {!expanded && hasNested && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle?.();
+          }}
+          aria-label="Show nested content"
+          className="ml-[26px] mt-0.5 flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] text-ink-muted transition hover:bg-white/60 hover:text-ink"
+        >
+          <span className="font-serif italic">
+            {nestedBlocks.length} block{nestedBlocks.length === 1 ? '' : 's'} hidden
+          </span>
+          <span aria-hidden="true">↓</span>
+        </button>
+      )}
+
       {expanded && (
         <div className="ml-[26px] mt-1 border-l border-[#E5DFD8] pl-3">
           {hasNested && (
