@@ -676,6 +676,7 @@ function LessonBlock({
 
   return (
     <div
+      data-block-id={block.id}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}

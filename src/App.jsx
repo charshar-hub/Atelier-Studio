@@ -135,6 +135,34 @@ function makeCanonicalBlock(def) {
   };
 }
 
+// Converts one section from /api/structureLesson's sections[] shape into a
+// lesson sub-block. bullet_points → a steps block (rendered as a list).
+// expand → a text block holding the educator notes.
+function outlineSectionToBlock(section) {
+  const title = typeof section?.title === 'string' ? section.title.trim() : '';
+  if (section?.type === 'expand') {
+    return {
+      id: makeBlockId(),
+      type: 'text',
+      label: title || 'Deeper Understanding',
+      tint: BLOCK_TYPES.text.tint,
+      content: typeof section?.notes === 'string' ? section.notes : '',
+    };
+  }
+  const items = Array.isArray(section?.items)
+    ? section.items
+        .filter((t) => typeof t === 'string' && t.trim())
+        .map((text) => ({ id: makeItemId(), text: text.trim(), image: null }))
+    : [];
+  return {
+    id: makeBlockId(),
+    type: 'steps',
+    label: title || 'Section',
+    tint: BLOCK_TYPES.steps.tint,
+    items,
+  };
+}
+
 function normalizeBlock(raw) {
   const fallbackTint = (type) => BLOCK_TYPES[type]?.tint || '#A89178';
 
@@ -638,6 +666,7 @@ export default function App() {
   const [isMatchingStyle, setIsMatchingStyle] = useState(false);
   const [isStructuring, setIsStructuring] = useState(false);
   const [structuredOutline, setStructuredOutline] = useState(null);
+  const [isOutlineModalOpen, setIsOutlineModalOpen] = useState(false);
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
   const [pendingStyleMatch, setPendingStyleMatch] = useState(null);
   const [styleMatchDialogOpen, setStyleMatchDialogOpen] = useState(false);
@@ -1031,7 +1060,12 @@ export default function App() {
         throw new Error(error || `Request failed: ${resp.status}`);
       }
       const data = await resp.json();
-      setStructuredOutline({ outline: data, lessonTitle: lesson.title || '' });
+      setStructuredOutline({
+        outline: data,
+        lessonTitle: lesson.title || '',
+        lessonId: lesson.id,
+      });
+      setIsOutlineModalOpen(true);
       recordChange('Structured lesson outline', lesson.title || '');
     } catch (err) {
       console.error('Structure lesson failed:', err);
@@ -1039,6 +1073,61 @@ export default function App() {
     } finally {
       setIsStructuring(false);
     }
+  };
+
+  // After appending blocks, scroll the first one into view so the user can
+  // see that something actually happened.
+  const scrollToBlock = (blockId) => {
+    if (!blockId) return;
+    setTimeout(() => {
+      const el = document.querySelector(`[data-block-id="${blockId}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+  };
+
+  const handleInsertOutlineSection = (section) => {
+    const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
+    if (!targetLessonId) return;
+    const block = outlineSectionToBlock(section);
+    setLessons((prev) =>
+      prev.map((l) =>
+        l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, block] } : l,
+      ),
+    );
+    scrollToBlock(block.id);
+    recordChange('Inserted outline section', section?.title || '');
+  };
+
+  const handleInsertEntireOutline = () => {
+    const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
+    const sections = structuredOutline?.outline?.sections;
+    if (!targetLessonId || !Array.isArray(sections) || sections.length === 0) return;
+    const blocks = sections.map(outlineSectionToBlock);
+    setLessons((prev) =>
+      prev.map((l) =>
+        l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, ...blocks] } : l,
+      ),
+    );
+    scrollToBlock(blocks[0]?.id);
+    recordChange('Inserted full outline', structuredOutline.lessonTitle || '');
+    setIsOutlineModalOpen(false);
+  };
+
+  const handleReplaceWithOutline = () => {
+    const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
+    const sections = structuredOutline?.outline?.sections;
+    if (!targetLessonId || !Array.isArray(sections) || sections.length === 0) return;
+    const confirmed = window.confirm(
+      'Replace this lesson\'s content with the structured outline? Existing sections will be removed.',
+    );
+    if (!confirmed) return;
+    const blocks = sections.map(outlineSectionToBlock);
+    setLessons((prev) =>
+      prev.map((l) => (l.id === targetLessonId ? { ...l, subBlocks: blocks } : l)),
+    );
+    scrollToBlock(blocks[0]?.id);
+    recordChange('Replaced lesson with outline', structuredOutline.lessonTitle || '');
+    setIsOutlineModalOpen(false);
   };
 
   const handleGenerateCards = async (lessonId) => {
@@ -2004,11 +2093,17 @@ export default function App() {
           onClose={() => setIsExportOpen(false)}
         />
       )}
-      {structuredOutline && (
+      {isOutlineModalOpen && structuredOutline && (
         <StructuredOutlineModal
           outline={structuredOutline.outline}
           lessonTitle={structuredOutline.lessonTitle}
-          onClose={() => setStructuredOutline(null)}
+          canApply={Boolean(
+            lessons.some((l) => l.id === (structuredOutline.lessonId || selectedLessonId)),
+          )}
+          onInsertSection={handleInsertOutlineSection}
+          onInsertAll={handleInsertEntireOutline}
+          onReplace={handleReplaceWithOutline}
+          onClose={() => setIsOutlineModalOpen(false)}
         />
       )}
       {showOnboardingIntro && (
