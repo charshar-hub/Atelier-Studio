@@ -122,13 +122,50 @@ function Section({ section, canApply, onAdd }) {
       {isExpand ? (
         <p className="text-[14px] leading-[1.6] text-ink">{notes}</p>
       ) : (
-        <ul className="space-y-1.5">
-          {items.map((item, i) => (
-            <li key={i} className="flex gap-2.5 text-[14px] leading-[1.55] text-ink">
-              <span className="mt-[9px] inline-block h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
-              <span>{item}</span>
-            </li>
-          ))}
+        <ul className="space-y-2.5">
+          {items.map((item, i) => {
+            const bulletText =
+              typeof item === 'string'
+                ? item
+                : typeof item?.title === 'string'
+                  ? item.title
+                  : typeof item?.text === 'string'
+                    ? item.text
+                    : '';
+            const nested =
+              item && typeof item === 'object' && Array.isArray(item.blocks)
+                ? item.blocks
+                : [];
+            return (
+              <li key={i} className="text-[14px] leading-[1.55] text-ink">
+                <div className="flex gap-2.5">
+                  <span className="mt-[9px] inline-block h-1 w-1 flex-shrink-0 rounded-full bg-accent" />
+                  <span>{bulletText}</span>
+                </div>
+                {nested.length > 0 && (
+                  <div className="mt-1.5 ml-[14px] space-y-1 border-l border-whisper pl-3">
+                    {nested.map((nb, ni) => {
+                      if (!nb || typeof nb !== 'object') return null;
+                      const content =
+                        typeof nb.content === 'string' ? nb.content : '';
+                      if (!content) return null;
+                      const tone =
+                        nb.type === 'tip'
+                          ? 'text-ink'
+                          : nb.type === 'note'
+                            ? 'text-ink-soft italic'
+                            : 'text-ink-soft';
+                      return (
+                        <p key={ni} className={`text-[13px] leading-[1.55] ${tone}`}>
+                          {content}
+                        </p>
+                      );
+                    })}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
