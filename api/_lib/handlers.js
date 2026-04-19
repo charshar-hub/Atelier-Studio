@@ -254,7 +254,8 @@ Do not explain anything outside the JSON.`;
 const STRUCTURE_LESSON_SYSTEM_PROMPT = `You are an expert beauty educator and course designer.
 
 Your task is NOT to write long paragraphs.
-Your task is to STRUCTURE a lesson like a professional training course.
+Your task is to STRUCTURE a lesson like a professional training course with
+expandable bullet nodes that hold nested teaching blocks.
 
 ---
 
@@ -263,9 +264,7 @@ User will provide a lesson topic or rough notes.
 
 ---
 
-OUTPUT FORMAT:
-
-Return structured JSON like this:
+OUTPUT FORMAT (STRICT JSON — no prose, no markdown fences):
 
 {
   "sections": [
@@ -273,8 +272,13 @@ Return structured JSON like this:
       "title": "Section name",
       "type": "bullet_points",
       "items": [
-        "Key teaching point",
-        "Key teaching point"
+        {
+          "title": "Short bullet title (what this bullet covers)",
+          "blocks": [
+            { "type": "text", "content": "A 1–2 sentence teaching note." },
+            { "type": "tip", "content": "Optional pointer or pro tip." }
+          ]
+        }
       ]
     },
     {
@@ -287,20 +291,32 @@ Return structured JSON like this:
 
 ---
 
+ITEM RULES:
+
+- Each item MUST be an object with "title" (short bullet phrase) and "blocks".
+- "blocks" is an array of 0–3 nested teaching blocks. Empty is fine for surface-level bullets.
+- Allowed block types: "text", "tip", "note". (Do not invent images or comparisons in structure output.)
+- "text" is a short teaching explanation (1–2 sentences).
+- "tip" is a practical pointer the educator should emphasise. Use sparingly.
+- "note" is a small caution or reminder. Use sparingly.
+- Keep content teachable and concise — this is structure, not a full lesson.
+
+---
+
 RULES:
 
-1. Think like a beauty trainer teaching beginners
-2. Break content into logical teaching sections
-3. Use bullet points for foundational knowledge
-4. Identify areas that require deeper explanation
-5. Add a "Deeper Understanding" section when needed
-6. Keep it structured, not essay-style
-7. Prioritise clarity and teachability over length
+1. Think like a beauty trainer teaching beginners.
+2. Break content into logical teaching sections.
+3. Use bullet points with short titles for foundational knowledge.
+4. Add 1–2 nested blocks for bullets that deserve deeper teaching context.
+5. Add a "Deeper Understanding" ("expand") section when a concept needs prose.
+6. Prioritise clarity and teachability over length.
+7. No markdown, no fluff.
 
 ---
 
 GOAL:
-Help the educator teach clearly, not just provide information.`;
+Help the educator teach clearly inside an editor that expands each bullet into nested content.`;
 
 const REFINE_SECTION_SYSTEM_PROMPT = `You write or improve a single section of a lesson for premium beauty/esthetics online courses.
 

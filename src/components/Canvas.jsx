@@ -17,6 +17,8 @@ export default function Canvas({
   onDuplicateBlock,
   onConvertToBulletList,
   onDeleteBlock,
+  expandedBulletIds,
+  onToggleBullet,
   onAddBlock,
   onUpdateBlock,
   onReorderBlock,
@@ -105,6 +107,8 @@ export default function Canvas({
                 onDuplicateBlock={onDuplicateBlock}
                 onConvertToBulletList={onConvertToBulletList}
                 onDeleteBlock={onDeleteBlock}
+                expandedBulletIds={expandedBulletIds}
+                onToggleBullet={onToggleBullet}
                 onAddBlock={onAddBlock}
                 onUpdateBlock={onUpdateBlock}
                 onReorderBlock={onReorderBlock}
@@ -286,6 +290,8 @@ function ModuleSection({
   onDuplicateBlock,
   onConvertToBulletList,
   onDeleteBlock,
+  expandedBulletIds,
+  onToggleBullet,
   onAddBlock,
   onUpdateBlock,
   onReorderBlock,
@@ -321,6 +327,8 @@ function ModuleSection({
           onDuplicateBlock={onDuplicateBlock}
           onConvertToBulletList={onConvertToBulletList}
           onDeleteBlock={onDeleteBlock}
+          expandedBulletIds={expandedBulletIds}
+          onToggleBullet={onToggleBullet}
           onAddBlock={onAddBlock}
           onUpdateBlock={onUpdateBlock}
           onReorderBlock={onReorderBlock}
@@ -406,6 +414,8 @@ function LessonCard({
   onDuplicateBlock,
   onConvertToBulletList,
   onDeleteBlock,
+  expandedBulletIds,
+  onToggleBullet,
   onAddBlock,
   onUpdateBlock,
   onReorderBlock,
@@ -527,6 +537,8 @@ function LessonCard({
                 onDelete={
                   onDeleteBlock ? () => onDeleteBlock(lesson.id, sb.id) : undefined
                 }
+                expandedBulletIds={expandedBulletIds}
+                onToggleBullet={onToggleBullet}
                 onRefine={
                   onRefineSection ? () => onRefineSection(lesson.id, sb.id) : undefined
                 }
@@ -658,6 +670,8 @@ function LessonBlock({
   onDelete,
   onRefine,
   isRefining,
+  expandedBulletIds,
+  onToggleBullet,
 }) {
   const isPlainText = block.type === 'text' || block.type === 'tips' || block.type === 'custom';
   const hasContent = isPlainText && Boolean(block.content && block.content.trim());
@@ -832,17 +846,26 @@ function LessonBlock({
         block={block}
         onChange={onChange}
         onUpdate={onUpdate}
+        expandedBulletIds={expandedBulletIds}
+        onToggleBullet={onToggleBullet}
       />
     </div>
   );
 }
 
-function BlockBody({ block, onChange, onUpdate }) {
+function BlockBody({ block, onChange, onUpdate, expandedBulletIds, onToggleBullet }) {
   if (block.type === 'steps') {
     return <StepsBody block={block} onUpdate={onUpdate} />;
   }
   if (block.type === 'bullet_list') {
-    return <BulletListBody block={block} onUpdate={onUpdate} />;
+    return (
+      <BulletListBody
+        block={block}
+        onUpdate={onUpdate}
+        expandedBulletIds={expandedBulletIds}
+        onToggleBullet={onToggleBullet}
+      />
+    );
   }
   if (block.type === 'visual') {
     return <VisualBody block={block} onUpdate={onUpdate} />;
@@ -860,9 +883,31 @@ function BlockBody({ block, onChange, onUpdate }) {
   );
 }
 
-/* ───────────────────────── Bullet list (text-only items) ────────────────── */
+/* ───────────────────── Bullet list (expandable, nested blocks) ─────────── */
 
-function BulletListBody({ block, onUpdate }) {
+const NESTED_BLOCK_MENU = [
+  { key: 'text', label: 'Text' },
+  { key: 'image', label: 'Image' },
+  { key: 'tip', label: 'Tip' },
+  { key: 'comparison', label: 'Comparison' },
+  { key: 'divider', label: 'Divider' },
+];
+
+function makeNestedBlockLocal(type) {
+  const base = { id: makeLocalId(), type };
+  switch (type) {
+    case 'image':
+      return { ...base, image: null };
+    case 'comparison':
+      return { ...base, left: null, right: null, leftLabel: 'Correct', rightLabel: 'Incorrect' };
+    case 'divider':
+      return base;
+    default:
+      return { ...base, content: '' };
+  }
+}
+
+function BulletListBody({ block, onUpdate, expandedBulletIds, onToggleBullet }) {
   const items = Array.isArray(block.items) ? block.items : [];
 
   const updateItems = (next) => onUpdate?.({ items: next });
@@ -870,8 +915,14 @@ function BulletListBody({ block, onUpdate }) {
   const patchItem = (id, patch) =>
     updateItems(items.map((it) => (it.id === id ? { ...it, ...patch } : it)));
 
-  const addItem = () =>
-    updateItems([...items, { id: makeLocalId(), text: '' }]);
+  const insertItemAt = (index) => {
+    const fresh = { id: makeLocalId(), text: '', blocks: [] };
+    const next = [...items];
+    next.splice(index, 0, fresh);
+    updateItems(next);
+  };
+
+  const addItem = () => insertItemAt(items.length);
 
   const removeItem = (id) =>
     updateItems(items.filter((it) => it.id !== id));
@@ -903,19 +954,29 @@ function BulletListBody({ block, onUpdate }) {
   }
 
   return (
-    <div className="space-y-1">
-      {items.map((item, i) => (
-        <BulletItemRow
-          key={item.id}
-          item={item}
-          canMoveUp={i > 0}
-          canMoveDown={i < items.length - 1}
-          onChangeText={(text) => patchItem(item.id, { text })}
-          onRemove={() => removeItem(item.id)}
-          onMoveUp={() => moveItem(item.id, -1)}
-          onMoveDown={() => moveItem(item.id, 1)}
-        />
-      ))}
+    <div>
+      {items.map((item, i) => {
+        const expanded = expandedBulletIds?.has(item.id) ?? false;
+        return (
+          <div key={item.id}>
+            <BulletItemRow
+              item={item}
+              expanded={expanded}
+              canMoveUp={i > 0}
+              canMoveDown={i < items.length - 1}
+              onToggle={() => onToggleBullet?.(item.id)}
+              onChangeText={(text) => patchItem(item.id, { text })}
+              onChangeBlocks={(blocks) => patchItem(item.id, { blocks })}
+              onRemove={() => removeItem(item.id)}
+              onMoveUp={() => moveItem(item.id, -1)}
+              onMoveDown={() => moveItem(item.id, 1)}
+            />
+            {i < items.length - 1 && (
+              <InsertBulletBetween onInsert={() => insertItemAt(i + 1)} />
+            )}
+          </div>
+        );
+      })}
       <button
         type="button"
         onClick={addItem}
@@ -927,20 +988,88 @@ function BulletListBody({ block, onUpdate }) {
   );
 }
 
+function InsertBulletBetween({ onInsert }) {
+  return (
+    <div className="group/gap relative h-1.5">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onInsert();
+        }}
+        aria-label="Insert bullet here"
+        className="absolute left-1/2 top-1/2 z-[1] flex -translate-x-1/2 -translate-y-1/2 items-center rounded-full border border-whisper bg-white px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-ink-muted opacity-0 shadow-[0_1px_2px_rgba(42,31,27,0.06)] transition hover:border-accent/50 hover:text-ink group-hover/gap:opacity-100"
+      >
+        + Insert
+      </button>
+      <div className="absolute left-3 right-3 top-1/2 h-px -translate-y-1/2 bg-whisper/60 opacity-0 transition group-hover/gap:opacity-100" />
+    </div>
+  );
+}
+
 function BulletItemRow({
   item,
+  expanded,
   canMoveUp,
   canMoveDown,
+  onToggle,
   onChangeText,
+  onChangeBlocks,
   onRemove,
   onMoveUp,
   onMoveDown,
 }) {
+  const nestedBlocks = Array.isArray(item.blocks) ? item.blocks : [];
+  const hasNested = nestedBlocks.length > 0;
+
+  const updateNested = (next) => onChangeBlocks?.(next);
+  const patchNested = (id, patch) =>
+    updateNested(nestedBlocks.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  const removeNested = (id) =>
+    updateNested(nestedBlocks.filter((b) => b.id !== id));
+  const moveNested = (id, dir) => {
+    const idx = nestedBlocks.findIndex((b) => b.id === id);
+    const target = idx + dir;
+    if (idx === -1 || target < 0 || target >= nestedBlocks.length) return;
+    const next = [...nestedBlocks];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    updateNested(next);
+  };
+  const addNested = (type) => updateNested([...nestedBlocks, makeNestedBlockLocal(type)]);
+  const convertNestedToText = (id) => {
+    const current = nestedBlocks.find((b) => b.id === id);
+    if (!current) return;
+    updateNested(
+      nestedBlocks.map((b) =>
+        b.id === id ? { id: b.id, type: 'text', content: '' } : b,
+      ),
+    );
+  };
+
   return (
-    <div className="group/bi relative rounded-md px-2 py-1">
-      <div className="flex items-start gap-3">
+    <div className="group/bi relative rounded-md px-2 py-0.5">
+      <div className="flex items-start gap-2">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle?.();
+          }}
+          aria-label={expanded ? 'Collapse bullet' : 'Expand bullet'}
+          aria-expanded={expanded}
+          className="mt-[10px] flex h-4 w-4 flex-shrink-0 items-center justify-center rounded text-ink-muted transition hover:bg-white/60 hover:text-ink"
+        >
+          <span
+            className={`inline-block text-[9px] leading-none transition-transform ${
+              expanded ? 'rotate-90' : ''
+            }`}
+            aria-hidden="true"
+          >
+            ▸
+          </span>
+        </button>
         <span
-          className="mt-[14px] inline-block h-1 w-1 flex-shrink-0 rounded-full bg-accent"
+          className="mt-[12px] inline-block h-1 w-1 flex-shrink-0 rounded-full bg-accent"
           aria-hidden="true"
         />
         <div className="min-w-0 flex-1">
@@ -948,7 +1077,7 @@ function BulletItemRow({
             value={item.text || ''}
             onChange={onChangeText}
             placeholder="Bullet point…"
-            className="w-full -mx-1.5 rounded bg-transparent px-1.5 py-1 text-[13.5px] leading-[1.7] text-ink transition-colors duration-150 hover:bg-white/70 focus:bg-white"
+            className="w-full -mx-1.5 rounded bg-transparent px-1.5 py-0.5 text-[13.5px] leading-[1.6] text-ink transition-colors duration-150 hover:bg-white/70 focus:bg-white"
           />
         </div>
         <div className="flex flex-col gap-0.5 opacity-0 transition group-hover/bi:opacity-100 focus-within:opacity-100">
@@ -963,6 +1092,203 @@ function BulletItemRow({
           </IconBtn>
         </div>
       </div>
+
+      {expanded && (
+        <div className="ml-[26px] mt-1 border-l border-[#E5DFD8] pl-3">
+          {hasNested && (
+            <div className="space-y-1.5 py-1">
+              {nestedBlocks.map((nb, ni) => (
+                <NestedBlock
+                  key={nb.id}
+                  block={nb}
+                  canMoveUp={ni > 0}
+                  canMoveDown={ni < nestedBlocks.length - 1}
+                  onChange={(patch) => patchNested(nb.id, patch)}
+                  onRemove={() => removeNested(nb.id)}
+                  onMoveUp={() => moveNested(nb.id, -1)}
+                  onMoveDown={() => moveNested(nb.id, 1)}
+                  onConvertToText={() => convertNestedToText(nb.id)}
+                />
+              ))}
+            </div>
+          )}
+          <AddNestedBlockButton onAdd={addNested} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddNestedBlockButton({ onAdd }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative my-1" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="rounded-md px-1.5 py-0.5 text-[10.5px] uppercase tracking-[0.14em] text-ink-muted transition hover:bg-white/60 hover:text-ink"
+      >
+        + Insert block
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute left-0 top-6 z-10 w-[160px] overflow-hidden rounded-md border border-whisper bg-white py-1 shadow-[0_6px_20px_rgba(42,31,27,0.10)]"
+        >
+          {NESTED_BLOCK_MENU.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOpen(false);
+                onAdd(opt.key);
+              }}
+              className="block w-full px-3 py-1.5 text-left text-[12.5px] text-ink transition hover:bg-paper/50"
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NestedBlock({
+  block,
+  canMoveUp,
+  canMoveDown,
+  onChange,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+  onConvertToText,
+}) {
+  const commonControls = (
+    <div className="flex flex-col gap-0.5 opacity-0 transition group-hover/nb:opacity-100 focus-within:opacity-100">
+      <IconBtn onClick={onMoveUp} disabled={!canMoveUp} aria-label="Move block up">
+        ↑
+      </IconBtn>
+      <IconBtn onClick={onMoveDown} disabled={!canMoveDown} aria-label="Move block down">
+        ↓
+      </IconBtn>
+      {block.type === 'image' && (
+        <IconBtn onClick={onConvertToText} aria-label="Convert image to text">
+          T
+        </IconBtn>
+      )}
+      <IconBtn onClick={onRemove} aria-label="Remove block" danger>
+        ×
+      </IconBtn>
+    </div>
+  );
+
+  if (block.type === 'divider') {
+    return (
+      <div className="group/nb relative flex items-center gap-2 py-1">
+        <hr className="h-px flex-1 border-0 bg-whisper" />
+        {commonControls}
+      </div>
+    );
+  }
+
+  if (block.type === 'image') {
+    return (
+      <div className="group/nb relative flex items-start gap-2 py-1">
+        <div className="min-w-0 flex-1">
+          <ImageUploader
+            image={block.image}
+            onChange={(image) => onChange({ image })}
+            onRemove={() => onChange({ image: null })}
+            compact
+            showSizePicker
+            placeholder="Add image"
+          />
+        </div>
+        {commonControls}
+      </div>
+    );
+  }
+
+  if (block.type === 'comparison') {
+    return (
+      <div className="group/nb relative flex items-start gap-2 py-1">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-2">
+          <div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.15em] text-ink-muted">
+              {block.leftLabel || 'Correct'}
+            </div>
+            <ImageUploader
+              image={block.left}
+              onChange={(left) => onChange({ left })}
+              onRemove={() => onChange({ left: null })}
+              compact
+              showSizePicker={false}
+              placeholder="Left image"
+            />
+          </div>
+          <div>
+            <div className="mb-1 text-[10px] uppercase tracking-[0.15em] text-ink-muted">
+              {block.rightLabel || 'Incorrect'}
+            </div>
+            <ImageUploader
+              image={block.right}
+              onChange={(right) => onChange({ right })}
+              onRemove={() => onChange({ right: null })}
+              compact
+              showSizePicker={false}
+              placeholder="Right image"
+            />
+          </div>
+        </div>
+        {commonControls}
+      </div>
+    );
+  }
+
+  // text / tip / note — all use RichText with different visual treatment.
+  const wrapperClass =
+    block.type === 'tip'
+      ? 'rounded-md border border-rose/40 bg-canvas/60 px-2.5 py-1.5'
+      : block.type === 'note'
+        ? 'rounded-md border border-whisper bg-paper/40 px-2.5 py-1.5'
+        : '';
+  const placeholder =
+    block.type === 'tip'
+      ? 'Pro tip…'
+      : block.type === 'note'
+        ? 'Note…'
+        : 'Add text…';
+
+  return (
+    <div className="group/nb relative flex items-start gap-2 py-0.5">
+      <div className={`min-w-0 flex-1 ${wrapperClass}`}>
+        <RichText
+          value={block.content || ''}
+          onChange={(content) => onChange({ content })}
+          placeholder={placeholder}
+          className="w-full rounded bg-transparent px-0.5 py-0.5 text-[13px] leading-[1.6] text-ink"
+        />
+      </div>
+      {commonControls}
     </div>
   );
 }

@@ -316,21 +316,33 @@ function SectionBody({ block }) {
     const items = Array.isArray(block.items) ? block.items : [];
     if (items.length === 0) return null;
     return (
-      <ul className="space-y-3">
-        {items.map((it, i) => (
-          <li key={it.id || i} className="flex items-start gap-3">
-            <span
-              className="mt-[13px] inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent"
-              aria-hidden="true"
-            />
-            {it.text && (
-              <div
-                className="rich-text text-[17px] leading-[1.7] text-ink"
-                dangerouslySetInnerHTML={{ __html: it.text }}
+      <ul className="space-y-4">
+        {items.map((it, i) => {
+          const nested = Array.isArray(it.blocks) ? it.blocks : [];
+          return (
+            <li key={it.id || i} className="flex items-start gap-3">
+              <span
+                className="mt-[13px] inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent"
+                aria-hidden="true"
               />
-            )}
-          </li>
-        ))}
+              <div className="min-w-0 flex-1">
+                {it.text && (
+                  <div
+                    className="rich-text text-[17px] leading-[1.7] text-ink"
+                    dangerouslySetInnerHTML={{ __html: it.text }}
+                  />
+                )}
+                {nested.length > 0 && (
+                  <div className="mt-2 ml-1 space-y-2 border-l border-[#E5DFD8] pl-4">
+                    {nested.map((nb, ni) => (
+                      <NestedPreviewBlock key={nb.id || ni} block={nb} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     );
   }
@@ -470,6 +482,61 @@ function SectionBody({ block }) {
       className="rich-text text-[17px] leading-[1.8] text-ink"
       dangerouslySetInnerHTML={{ __html: block.content || '' }}
     />
+  );
+}
+
+function NestedPreviewBlock({ block }) {
+  if (!block) return null;
+  if (block.type === 'divider') {
+    return <hr className="border-0 border-t border-whisper" />;
+  }
+  if (block.type === 'image') {
+    if (!block.image?.src) return null;
+    return (
+      <div className="flex justify-start">
+        <img
+          src={block.image.src}
+          alt=""
+          className={`rounded-lg ${imageWidthClass(block.image.width)}`}
+        />
+      </div>
+    );
+  }
+  if (block.type === 'comparison') {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {['left', 'right'].map((side) => {
+          const img = block[side];
+          const label = side === 'left' ? block.leftLabel : block.rightLabel;
+          return (
+            <div key={side}>
+              {label && (
+                <div className="mb-1 text-[11px] uppercase tracking-[0.15em] text-ink-muted">
+                  {label}
+                </div>
+              )}
+              {img?.src && (
+                <img src={img.src} alt="" className="w-full rounded-md" />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  const wrapperClass =
+    block.type === 'tip'
+      ? 'rounded-md border border-rose/40 bg-canvas/50 px-3 py-2'
+      : block.type === 'note'
+        ? 'rounded-md border border-whisper bg-paper/40 px-3 py-2'
+        : '';
+  return (
+    <div className={wrapperClass}>
+      <div
+        className="rich-text text-[15px] leading-[1.6] text-ink"
+        dangerouslySetInnerHTML={{ __html: block.content || '' }}
+      />
+    </div>
   );
 }
 

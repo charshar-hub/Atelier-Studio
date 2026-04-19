@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 export default function StructuredOutlineModal({
   outline,
   lessonTitle,
@@ -5,8 +7,10 @@ export default function StructuredOutlineModal({
   onInsertSection,
   onInsertAll,
   onReplace,
+  onCopy,
   onClose,
 }) {
+  const [copied, setCopied] = useState(false);
   const sections = Array.isArray(outline?.sections) ? outline.sections : [];
   const hasSections = sections.length > 0;
 
@@ -46,6 +50,18 @@ export default function StructuredOutlineModal({
             className="h-9 rounded-md border border-whisper bg-transparent px-4 text-[13px] tracking-wide text-ink transition hover:bg-paper"
           >
             Close
+          </button>
+          <button
+            onClick={async () => {
+              if (!onCopy) return;
+              await onCopy();
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1500);
+            }}
+            disabled={!hasSections}
+            className="h-9 rounded-md border border-whisper bg-transparent px-4 text-[13px] tracking-wide text-ink transition hover:bg-paper disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {copied ? 'Copied ✓' : 'Copy only'}
           </button>
           <button
             onClick={onReplace}

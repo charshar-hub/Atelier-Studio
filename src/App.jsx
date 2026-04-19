@@ -128,10 +128,72 @@ function blockTypeDefaults(type) {
   }
 }
 
+// Nested block types that can live inside a bullet_list item.
+const NESTED_BLOCK_TYPES = new Set([
+  'text',
+  'image',
+  'tip',
+  'note',
+  'comparison',
+  'divider',
+]);
+
+function normalizeNestedBlock(raw) {
+  const type = NESTED_BLOCK_TYPES.has(raw?.type) ? raw.type : 'text';
+  const base = { id: raw?.id || makeBlockId(), type };
+  if (type === 'image') {
+    return { ...base, image: normalizeImage(raw?.image) };
+  }
+  if (type === 'comparison') {
+    return {
+      ...base,
+      left: normalizeImage(raw?.left),
+      right: normalizeImage(raw?.right),
+      leftLabel:
+        typeof raw?.leftLabel === 'string' && raw.leftLabel.trim()
+          ? raw.leftLabel
+          : 'Correct',
+      rightLabel:
+        typeof raw?.rightLabel === 'string' && raw.rightLabel.trim()
+          ? raw.rightLabel
+          : 'Incorrect',
+    };
+  }
+  if (type === 'divider') return base;
+  return { ...base, content: typeof raw?.content === 'string' ? raw.content : '' };
+}
+
+function nestedBlockDefaults(type) {
+  switch (type) {
+    case 'image':
+      return { image: null };
+    case 'comparison':
+      return {
+        left: null,
+        right: null,
+        leftLabel: 'Correct',
+        rightLabel: 'Incorrect',
+      };
+    case 'divider':
+      return {};
+    default:
+      return { content: '' };
+  }
+}
+
+function makeNestedBlock(type) {
+  return {
+    id: makeBlockId(),
+    type,
+    ...nestedBlockDefaults(type),
+  };
+}
+
 function normalizeBulletItem(raw) {
   return {
     id: raw?.id || makeItemId(),
     text: typeof raw?.text === 'string' ? raw.text : '',
+    blocks: Array.isArray(raw?.blocks) ? raw.blocks.map(normalizeNestedBlock) : [],
   };
 }
 
@@ -147,8 +209,11 @@ function makeCanonicalBlock(def) {
 }
 
 // Converts one section from /api/structureLesson's sections[] shape into a
-// lesson sub-block. bullet_points → a bullet_list block (text-only items).
-// expand → a deep_dive block (styled callout with educator notes).
+// lesson sub-block. bullet_points → a bullet_list block whose items may carry
+// nested blocks. expand → a deep_dive callout.
+//
+// Items can arrive as plain strings (legacy/simple) or objects shaped like
+// { title, blocks: [{type, content}] } — both are accepted.
 function outlineSectionToBlock(section) {
   const title = typeof section?.title === 'string' ? section.title.trim() : '';
   if (section?.type === 'expand') {
@@ -160,11 +225,30 @@ function outlineSectionToBlock(section) {
       content: typeof section?.notes === 'string' ? section.notes : '',
     };
   }
-  const items = Array.isArray(section?.items)
-    ? section.items
-        .filter((t) => typeof t === 'string' && t.trim())
-        .map((text) => ({ id: makeItemId(), text: text.trim() }))
-    : [];
+  const rawItems = Array.isArray(section?.items) ? section.items : [];
+  const items = rawItems
+    .map((raw) => {
+      if (typeof raw === 'string') {
+        const text = raw.trim();
+        if (!text) return null;
+        return { id: makeItemId(), text, blocks: [] };
+      }
+      if (raw && typeof raw === 'object') {
+        const text =
+          typeof raw.title === 'string'
+            ? raw.title.trim()
+            : typeof raw.text === 'string'
+              ? raw.text.trim()
+              : '';
+        if (!text && !Array.isArray(raw.blocks)) return null;
+        const blocks = Array.isArray(raw.blocks)
+          ? raw.blocks.map(normalizeNestedBlock)
+          : [];
+        return { id: makeItemId(), text, blocks };
+      }
+      return null;
+    })
+    .filter(Boolean);
   return {
     id: makeBlockId(),
     type: 'bullet_list',
@@ -684,6 +768,7 @@ export default function App() {
   const [isOutlineModalOpen, setIsOutlineModalOpen] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
   const [pendingExpansion, setPendingExpansion] = useState(null);
+  const [expandedBulletIds, setExpandedBulletIds] = useState(() => new Set());
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
   const [pendingStyleMatch, setPendingStyleMatch] = useState(null);
   const [styleMatchDialogOpen, setStyleMatchDialogOpen] = useState(false);
@@ -1115,6 +1200,21 @@ export default function App() {
     recordChange('Inserted outline section', section?.title || '');
   };
 
+  // Collect the first N bullet item ids from a freshly-inserted set of blocks
+  // so we can auto-expand them in the UI.
+  const collectFirstBulletItemIds = (blocks, limit = 2) => {
+    const ids = [];
+    for (const b of blocks) {
+      if (b.type !== 'bullet_list' || !Array.isArray(b.items)) continue;
+      for (const it of b.items) {
+        if (ids.length >= limit) break;
+        if (it?.id) ids.push(it.id);
+      }
+      if (ids.length >= limit) break;
+    }
+    return ids;
+  };
+
   const handleInsertEntireOutline = () => {
     const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
     const sections = structuredOutline?.outline?.sections;
@@ -1125,6 +1225,14 @@ export default function App() {
         l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, ...blocks] } : l,
       ),
     );
+    const autoExpand = collectFirstBulletItemIds(blocks, 2);
+    if (autoExpand.length > 0) {
+      setExpandedBulletIds((prev) => {
+        const next = new Set(prev);
+        autoExpand.forEach((id) => next.add(id));
+        return next;
+      });
+    }
     scrollToBlock(blocks[0]?.id);
     recordChange('Inserted full outline', structuredOutline.lessonTitle || '');
     setIsOutlineModalOpen(false);
@@ -1142,9 +1250,64 @@ export default function App() {
     setLessons((prev) =>
       prev.map((l) => (l.id === targetLessonId ? { ...l, subBlocks: blocks } : l)),
     );
+    const autoExpand = collectFirstBulletItemIds(blocks, 2);
+    if (autoExpand.length > 0) {
+      setExpandedBulletIds((prev) => {
+        const next = new Set(prev);
+        autoExpand.forEach((id) => next.add(id));
+        return next;
+      });
+    }
     scrollToBlock(blocks[0]?.id);
     recordChange('Replaced lesson with outline', structuredOutline.lessonTitle || '');
     setIsOutlineModalOpen(false);
+  };
+
+  const handleCopyOutlineToClipboard = async () => {
+    const sections = structuredOutline?.outline?.sections;
+    if (!Array.isArray(sections)) return;
+    const text = sections
+      .map((s) => {
+        const title = typeof s?.title === 'string' ? s.title.trim() : '';
+        if (s?.type === 'expand') {
+          const notes = typeof s?.notes === 'string' ? s.notes.trim() : '';
+          return `${title}\n${notes}`;
+        }
+        const items = Array.isArray(s?.items) ? s.items : [];
+        const lines = items
+          .map((it) => {
+            if (typeof it === 'string') return `• ${it.trim()}`;
+            const bTitle = typeof it?.title === 'string' ? it.title.trim() : '';
+            const sub = Array.isArray(it?.blocks)
+              ? it.blocks
+                  .map((b) => (typeof b?.content === 'string' ? `    ${b.content.trim()}` : ''))
+                  .filter(Boolean)
+                  .join('\n')
+              : '';
+            return sub ? `• ${bTitle}\n${sub}` : `• ${bTitle}`;
+          })
+          .filter(Boolean)
+          .join('\n');
+        return `${title}\n${lines}`;
+      })
+      .filter(Boolean)
+      .join('\n\n');
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Clipboard write failed:', err);
+      alert('Could not copy to clipboard. Check browser permissions.');
+    }
+  };
+
+  const handleToggleBullet = (bulletId) => {
+    if (!bulletId) return;
+    setExpandedBulletIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(bulletId)) next.delete(bulletId);
+      else next.add(bulletId);
+      return next;
+    });
   };
 
   const handleExpandLesson = async () => {
@@ -2210,6 +2373,8 @@ export default function App() {
               onDuplicateBlock={handleDuplicateBlock}
               onConvertToBulletList={handleConvertToBulletList}
               onDeleteBlock={handleDeleteBlock}
+              expandedBulletIds={expandedBulletIds}
+              onToggleBullet={handleToggleBullet}
               onAddBlock={handleAddBlock}
               onUpdateBlock={handleUpdateBlock}
               onReorderBlock={handleReorderBlock}
@@ -2278,6 +2443,7 @@ export default function App() {
           onInsertSection={handleInsertOutlineSection}
           onInsertAll={handleInsertEntireOutline}
           onReplace={handleReplaceWithOutline}
+          onCopy={handleCopyOutlineToClipboard}
           onClose={() => setIsOutlineModalOpen(false)}
         />
       )}

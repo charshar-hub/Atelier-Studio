@@ -29,7 +29,20 @@ export function blockToPlainText(sb) {
       return (sb.items || [])
         .map((it) => {
           const text = htmlToPlain(it.text).trim();
-          return text ? `• ${text}` : '';
+          const nestedLines = Array.isArray(it.blocks)
+            ? it.blocks
+                .map((nb) => {
+                  if (!nb) return '';
+                  if (nb.type === 'divider') return '---';
+                  if (nb.type === 'image' || nb.type === 'comparison') return '';
+                  return htmlToPlain(nb.content || '').trim();
+                })
+                .filter(Boolean)
+                .map((line) => `    ${line}`)
+                .join('\n')
+            : '';
+          if (!text && !nestedLines) return '';
+          return nestedLines ? `• ${text}\n${nestedLines}` : `• ${text}`;
         })
         .filter(Boolean)
         .join('\n');
@@ -54,7 +67,20 @@ export function blockHasContent(sb) {
         (it) => htmlToPlain(it.text).trim() || it.image?.src,
       );
     case 'bullet_list':
-      return (sb.items || []).some((it) => htmlToPlain(it.text).trim());
+      return (sb.items || []).some((it) => {
+        if (htmlToPlain(it.text).trim()) return true;
+        return (
+          Array.isArray(it.blocks) &&
+          it.blocks.some((nb) => {
+            if (!nb) return false;
+            if (nb.type === 'image') return Boolean(nb.image?.src);
+            if (nb.type === 'comparison')
+              return Boolean(nb.left?.src || nb.right?.src);
+            if (nb.type === 'divider') return true;
+            return Boolean(htmlToPlain(nb.content || '').trim());
+          })
+        );
+      });
     case 'visual':
       return (
         Boolean(sb.image?.src) ||
