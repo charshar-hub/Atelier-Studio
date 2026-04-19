@@ -15,6 +15,7 @@ export default function Canvas({
   onUpdateSubBlock,
   onRenameBlock,
   onDuplicateBlock,
+  onConvertToBulletList,
   onDeleteBlock,
   onAddBlock,
   onUpdateBlock,
@@ -102,6 +103,7 @@ export default function Canvas({
                 onUpdateSubBlock={onUpdateSubBlock}
                 onRenameBlock={onRenameBlock}
                 onDuplicateBlock={onDuplicateBlock}
+                onConvertToBulletList={onConvertToBulletList}
                 onDeleteBlock={onDeleteBlock}
                 onAddBlock={onAddBlock}
                 onUpdateBlock={onUpdateBlock}
@@ -282,6 +284,7 @@ function ModuleSection({
   onUpdateSubBlock,
   onRenameBlock,
   onDuplicateBlock,
+  onConvertToBulletList,
   onDeleteBlock,
   onAddBlock,
   onUpdateBlock,
@@ -316,6 +319,7 @@ function ModuleSection({
           onUpdateSubBlock={onUpdateSubBlock}
           onRenameBlock={onRenameBlock}
           onDuplicateBlock={onDuplicateBlock}
+          onConvertToBulletList={onConvertToBulletList}
           onDeleteBlock={onDeleteBlock}
           onAddBlock={onAddBlock}
           onUpdateBlock={onUpdateBlock}
@@ -400,6 +404,7 @@ function LessonCard({
   onUpdateSubBlock,
   onRenameBlock,
   onDuplicateBlock,
+  onConvertToBulletList,
   onDeleteBlock,
   onAddBlock,
   onUpdateBlock,
@@ -513,6 +518,11 @@ function LessonCard({
                 }
                 onDuplicate={
                   onDuplicateBlock ? () => onDuplicateBlock(lesson.id, sb.id) : undefined
+                }
+                onConvertToBulletList={
+                  onConvertToBulletList && sb.type === 'steps'
+                    ? () => onConvertToBulletList(lesson.id, sb.id)
+                    : undefined
                 }
                 onDelete={
                   onDeleteBlock ? () => onDeleteBlock(lesson.id, sb.id) : undefined
@@ -644,6 +654,7 @@ function LessonBlock({
   onUpdate,
   onRename,
   onDuplicate,
+  onConvertToBulletList,
   onDelete,
   onRefine,
   isRefining,
@@ -674,16 +685,20 @@ function LessonBlock({
     el.select();
   };
 
+  const isDeepDive = block.type === 'deep_dive';
+
   return (
     <div
       data-block-id={block.id}
       onDragOver={onDragOver}
       onDrop={onDrop}
       onDragEnd={onDragEnd}
-      className={`group/sb relative rounded-lg bg-canvas px-4 py-3 transition ${
-        isDragging ? 'opacity-40' : ''
-      } ${isDropTarget ? 'ring-2 ring-accent/50' : ''}`}
-      style={{ borderLeft: `2px solid ${block.tint}` }}
+      className={`group/sb relative rounded-lg px-4 py-3 transition ${
+        isDeepDive ? 'border border-rose/40 bg-canvas/70' : 'bg-canvas'
+      } ${isDragging ? 'opacity-40' : ''} ${
+        isDropTarget ? 'ring-2 ring-accent/50' : ''
+      }`}
+      style={isDeepDive ? undefined : { borderLeft: `2px solid ${block.tint}` }}
     >
       {onDragStart && (
         <span
@@ -740,7 +755,7 @@ function LessonBlock({
               )}
             </button>
           )}
-          {(onRename || onDuplicate || onDelete) && (
+          {(onRename || onDuplicate || onConvertToBulletList || onDelete) && (
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
@@ -784,6 +799,17 @@ function LessonBlock({
                       Duplicate
                     </MenuItem>
                   )}
+                  {onConvertToBulletList && (
+                    <MenuItem
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMenuOpen(false);
+                        onConvertToBulletList();
+                      }}
+                    >
+                      Convert to bullet list
+                    </MenuItem>
+                  )}
                   {onDelete && (
                     <MenuItem
                       danger
@@ -815,6 +841,9 @@ function BlockBody({ block, onChange, onUpdate }) {
   if (block.type === 'steps') {
     return <StepsBody block={block} onUpdate={onUpdate} />;
   }
+  if (block.type === 'bullet_list') {
+    return <BulletListBody block={block} onUpdate={onUpdate} />;
+  }
   if (block.type === 'visual') {
     return <VisualBody block={block} onUpdate={onUpdate} />;
   }
@@ -828,6 +857,113 @@ function BlockBody({ block, onChange, onUpdate }) {
       placeholder={`Add ${(block.label || 'content').toLowerCase()}…`}
       className="-mx-1.5 w-[calc(100%+0.75rem)] rounded bg-transparent px-1.5 py-1 text-[13.5px] leading-[1.7] text-ink transition-colors duration-150 hover:bg-white/70 focus:bg-white"
     />
+  );
+}
+
+/* ───────────────────────── Bullet list (text-only items) ────────────────── */
+
+function BulletListBody({ block, onUpdate }) {
+  const items = Array.isArray(block.items) ? block.items : [];
+
+  const updateItems = (next) => onUpdate?.({ items: next });
+
+  const patchItem = (id, patch) =>
+    updateItems(items.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+
+  const addItem = () =>
+    updateItems([...items, { id: makeLocalId(), text: '' }]);
+
+  const removeItem = (id) =>
+    updateItems(items.filter((it) => it.id !== id));
+
+  const moveItem = (id, dir) => {
+    const idx = items.findIndex((it) => it.id === id);
+    const target = idx + dir;
+    if (idx === -1 || target < 0 || target >= items.length) return;
+    const next = [...items];
+    [next[idx], next[target]] = [next[target], next[idx]];
+    updateItems(next);
+  };
+
+  if (items.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-whisper bg-white/40 px-4 py-5 text-center">
+        <p className="mb-2 font-serif text-[14px] italic text-ink-soft">
+          No bullet points yet.
+        </p>
+        <button
+          type="button"
+          onClick={addItem}
+          className="rounded-md bg-ink px-3 py-1.5 text-[11px] uppercase tracking-[0.15em] text-canvas transition hover:bg-[#2A1F18]"
+        >
+          + Add first bullet
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      {items.map((item, i) => (
+        <BulletItemRow
+          key={item.id}
+          item={item}
+          canMoveUp={i > 0}
+          canMoveDown={i < items.length - 1}
+          onChangeText={(text) => patchItem(item.id, { text })}
+          onRemove={() => removeItem(item.id)}
+          onMoveUp={() => moveItem(item.id, -1)}
+          onMoveDown={() => moveItem(item.id, 1)}
+        />
+      ))}
+      <button
+        type="button"
+        onClick={addItem}
+        className="mt-1 rounded-md px-2 py-1 text-[11px] uppercase tracking-[0.16em] text-ink-muted transition hover:bg-white/60 hover:text-ink"
+      >
+        + Add bullet
+      </button>
+    </div>
+  );
+}
+
+function BulletItemRow({
+  item,
+  canMoveUp,
+  canMoveDown,
+  onChangeText,
+  onRemove,
+  onMoveUp,
+  onMoveDown,
+}) {
+  return (
+    <div className="group/bi relative rounded-md px-2 py-1">
+      <div className="flex items-start gap-3">
+        <span
+          className="mt-[14px] inline-block h-1 w-1 flex-shrink-0 rounded-full bg-accent"
+          aria-hidden="true"
+        />
+        <div className="min-w-0 flex-1">
+          <RichText
+            value={item.text || ''}
+            onChange={onChangeText}
+            placeholder="Bullet point…"
+            className="w-full -mx-1.5 rounded bg-transparent px-1.5 py-1 text-[13.5px] leading-[1.7] text-ink transition-colors duration-150 hover:bg-white/70 focus:bg-white"
+          />
+        </div>
+        <div className="flex flex-col gap-0.5 opacity-0 transition group-hover/bi:opacity-100 focus-within:opacity-100">
+          <IconBtn onClick={onMoveUp} disabled={!canMoveUp} aria-label="Move bullet up">
+            ↑
+          </IconBtn>
+          <IconBtn onClick={onMoveDown} disabled={!canMoveDown} aria-label="Move bullet down">
+            ↓
+          </IconBtn>
+          <IconBtn onClick={onRemove} aria-label="Remove bullet" danger>
+            ×
+          </IconBtn>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1217,6 +1353,8 @@ function MenuItem({ children, onClick, danger }) {
 
 const SECTION_TYPES = [
   { key: 'text', label: 'Text', desc: 'Prose or notes' },
+  { key: 'bullet_list', label: 'Bullet list', desc: 'A clean list of points — no images' },
+  { key: 'deep_dive', label: 'Deep dive', desc: 'A highlighted callout for deeper context' },
   { key: 'steps', label: 'Demo steps', desc: 'Numbered steps, each with an optional image' },
   { key: 'tips', label: 'Tips', desc: 'Quick pointers' },
   { key: 'visual', label: 'Visual example', desc: 'An image with caption and notes' },

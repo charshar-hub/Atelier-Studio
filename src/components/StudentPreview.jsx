@@ -312,6 +312,39 @@ function SectionCard({ block }) {
 }
 
 function SectionBody({ block }) {
+  if (block.type === 'bullet_list') {
+    const items = Array.isArray(block.items) ? block.items : [];
+    if (items.length === 0) return null;
+    return (
+      <ul className="space-y-3">
+        {items.map((it, i) => (
+          <li key={it.id || i} className="flex items-start gap-3">
+            <span
+              className="mt-[13px] inline-block h-1.5 w-1.5 flex-shrink-0 rounded-full bg-accent"
+              aria-hidden="true"
+            />
+            {it.text && (
+              <div
+                className="rich-text text-[17px] leading-[1.7] text-ink"
+                dangerouslySetInnerHTML={{ __html: it.text }}
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  if (block.type === 'deep_dive') {
+    if (!block.content) return null;
+    return (
+      <div className="rounded-[10px] border border-rose/40 bg-canvas/60 px-5 py-4">
+        <div
+          className="rich-text text-[17px] leading-[1.7] text-ink"
+          dangerouslySetInnerHTML={{ __html: block.content }}
+        />
+      </div>
+    );
+  }
   if (block.type === 'steps') {
     const items = Array.isArray(block.items) ? block.items : [];
     if (items.length === 0) return null;

@@ -25,6 +25,14 @@ export function blockToPlainText(sb) {
         })
         .filter(Boolean)
         .join('\n');
+    case 'bullet_list':
+      return (sb.items || [])
+        .map((it) => {
+          const text = htmlToPlain(it.text).trim();
+          return text ? `• ${text}` : '';
+        })
+        .filter(Boolean)
+        .join('\n');
     case 'visual':
       return [sb.caption, ...(Array.isArray(sb.notes) ? sb.notes : [])]
         .filter((s) => typeof s === 'string' && s.trim())
@@ -45,6 +53,8 @@ export function blockHasContent(sb) {
       return (sb.items || []).some(
         (it) => htmlToPlain(it.text).trim() || it.image?.src,
       );
+    case 'bullet_list':
+      return (sb.items || []).some((it) => htmlToPlain(it.text).trim());
     case 'visual':
       return (
         Boolean(sb.image?.src) ||

@@ -22,6 +22,8 @@ import * as coursesApi from './lib/courses';
 
 const BLOCK_TYPES = {
   text: { label: 'Text', defaultLabel: 'Notes', tint: '#B8936A' },
+  bullet_list: { label: 'Bullet list', defaultLabel: 'Key points', tint: '#C9A876' },
+  deep_dive: { label: 'Deep dive', defaultLabel: 'Deeper understanding', tint: '#D4A89A' },
   steps: { label: 'Demo steps', defaultLabel: 'Demo steps', tint: '#D4A89A' },
   tips: { label: 'Tips', defaultLabel: 'Tips', tint: '#C9A876' },
   custom: { label: 'Custom section', defaultLabel: 'Section', tint: '#A89178' },
@@ -111,6 +113,7 @@ function splitLegacyStepsContent(content) {
 function blockTypeDefaults(type) {
   switch (type) {
     case 'steps':
+    case 'bullet_list':
       return { items: [] };
     case 'visual':
       return { image: null, caption: '', notes: [], layout: 'standard' };
@@ -125,6 +128,13 @@ function blockTypeDefaults(type) {
   }
 }
 
+function normalizeBulletItem(raw) {
+  return {
+    id: raw?.id || makeItemId(),
+    text: typeof raw?.text === 'string' ? raw.text : '',
+  };
+}
+
 function makeCanonicalBlock(def) {
   return {
     id: makeBlockId(),
@@ -137,29 +147,29 @@ function makeCanonicalBlock(def) {
 }
 
 // Converts one section from /api/structureLesson's sections[] shape into a
-// lesson sub-block. bullet_points → a steps block (rendered as a list).
-// expand → a text block holding the educator notes.
+// lesson sub-block. bullet_points → a bullet_list block (text-only items).
+// expand → a deep_dive block (styled callout with educator notes).
 function outlineSectionToBlock(section) {
   const title = typeof section?.title === 'string' ? section.title.trim() : '';
   if (section?.type === 'expand') {
     return {
       id: makeBlockId(),
-      type: 'text',
-      label: title || 'Deeper Understanding',
-      tint: BLOCK_TYPES.text.tint,
+      type: 'deep_dive',
+      label: title || 'Deeper understanding',
+      tint: BLOCK_TYPES.deep_dive.tint,
       content: typeof section?.notes === 'string' ? section.notes : '',
     };
   }
   const items = Array.isArray(section?.items)
     ? section.items
         .filter((t) => typeof t === 'string' && t.trim())
-        .map((text) => ({ id: makeItemId(), text: text.trim(), image: null }))
+        .map((text) => ({ id: makeItemId(), text: text.trim() }))
     : [];
   return {
     id: makeBlockId(),
-    type: 'steps',
+    type: 'bullet_list',
     label: title || 'Section',
-    tint: BLOCK_TYPES.steps.tint,
+    tint: BLOCK_TYPES.bullet_list.tint,
     items,
   };
 }
@@ -181,6 +191,10 @@ function normalizeBlock(raw) {
       if (items.length === 0 && typeof raw.content === 'string' && raw.content.trim()) {
         return { ...base, items: splitLegacyStepsContent(raw.content) };
       }
+      return { ...base, items };
+    }
+    if (raw.type === 'bullet_list') {
+      const items = Array.isArray(raw.items) ? raw.items.map(normalizeBulletItem) : [];
       return { ...base, items };
     }
     if (raw.type === 'visual') {
@@ -1138,9 +1152,11 @@ export default function App() {
     const lesson = lessons.find((l) => l.id === selectedLessonId);
     if (!lesson) return;
 
-    // Only steps blocks carry bullet lists — serialize those for the API.
+    // Bullet-style blocks (bullet_list and legacy steps) are what we send to
+    // the API. Plain text / deep-dive / visual blocks are skipped — they're
+    // already prose or imagery.
     const sections = lesson.subBlocks
-      .filter((sb) => sb.type === 'steps')
+      .filter((sb) => sb.type === 'bullet_list' || sb.type === 'steps')
       .map((sb) => ({
         title: sb.label || 'Section',
         items: (sb.items || [])
@@ -1151,7 +1167,7 @@ export default function App() {
 
     if (sections.length === 0) {
       alert(
-        'This lesson has no bullet-style sections to expand. Use "Structure lesson" first, or add a Demo steps block.',
+        'This lesson has no bullet sections to expand. Use "Structure lesson" first, or add a Bullet list block.',
       );
       return;
     }
@@ -1217,7 +1233,7 @@ export default function App() {
         const next = [];
         l.subBlocks.forEach((sb) => {
           next.push(sb);
-          if (sb.type !== 'steps') return;
+          if (sb.type !== 'steps' && sb.type !== 'bullet_list') return;
           const match = newBlocks.find(
             (nb) => nb.sectionTitle && nb.sectionTitle === (sb.label || '').trim().toLowerCase(),
           );
@@ -1249,7 +1265,10 @@ export default function App() {
     const l = lessons.find((x) => x.id === selectedLessonId);
     if (!l) return false;
     return l.subBlocks.some(
-      (sb) => sb.type === 'steps' && Array.isArray(sb.items) && sb.items.some((i) => i?.text?.trim()),
+      (sb) =>
+        (sb.type === 'bullet_list' || sb.type === 'steps') &&
+        Array.isArray(sb.items) &&
+        sb.items.some((i) => i?.text?.trim()),
     );
   })();
 
@@ -1505,6 +1524,35 @@ export default function App() {
       }),
     );
     recordChange('Duplicated a section');
+  };
+
+  // Convert a legacy `steps` block (numbered items with image uploaders) into a
+  // `bullet_list` block (clean text-only items). Used to clean up lessons that
+  // were populated by Structure Lesson before bullet_list existed.
+  const handleConvertToBulletList = (lessonId, blockId) => {
+    setLessons((prev) =>
+      prev.map((l) => {
+        if (l.id !== lessonId) return l;
+        return {
+          ...l,
+          subBlocks: l.subBlocks.map((sb) => {
+            if (sb.id !== blockId || sb.type !== 'steps') return sb;
+            const items = Array.isArray(sb.items) ? sb.items : [];
+            return {
+              id: sb.id,
+              type: 'bullet_list',
+              label: sb.label,
+              tint: BLOCK_TYPES.bullet_list.tint,
+              items: items.map((it) => ({
+                id: it.id || makeItemId(),
+                text: typeof it.text === 'string' ? it.text : '',
+              })),
+            };
+          }),
+        };
+      }),
+    );
+    recordChange('Converted demo steps to bullet list');
   };
 
   const handleDeleteBlock = (lessonId, blockId) => {
@@ -2160,6 +2208,7 @@ export default function App() {
               onUpdateSubBlock={handleUpdateSubBlock}
               onRenameBlock={handleRenameBlock}
               onDuplicateBlock={handleDuplicateBlock}
+              onConvertToBulletList={handleConvertToBulletList}
               onDeleteBlock={handleDeleteBlock}
               onAddBlock={handleAddBlock}
               onUpdateBlock={handleUpdateBlock}
