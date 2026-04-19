@@ -209,11 +209,45 @@ function makeCanonicalBlock(def) {
 }
 
 // Converts one section from /api/structureLesson's sections[] shape into a
-// lesson sub-block. bullet_points → a bullet_list block whose items may carry
-// nested blocks. expand → a deep_dive callout.
+// lesson sub-block. bullet_points → a bullet_list block whose items always
+// carry at least two nested blocks (enforced by hydrateBulletItemBlocks).
+// expand → a deep_dive callout.
 //
 // Items can arrive as plain strings (legacy/simple) or objects shaped like
-// { title, blocks: [{type, content}] } — both are accepted.
+// { title, blocks: [{type, content}] } — both are accepted, both get
+// normalised to { id, text, blocks: [...] } with populated blocks so the
+// editor never ends up with "title-only" bullets even when the AI output
+// is truncated or partial.
+function hydrateBulletItemBlocks(rawBlocks, bulletText) {
+  const normalised = Array.isArray(rawBlocks)
+    ? rawBlocks.map(normalizeNestedBlock)
+    : [];
+  // Drop any nested text/tip/note blocks whose content came back empty —
+  // those are effectively noise from a truncated generation.
+  const pruned = normalised.filter((b) => {
+    if (b.type === 'image' || b.type === 'comparison' || b.type === 'divider') {
+      return true;
+    }
+    return typeof b.content === 'string' && b.content.trim();
+  });
+
+  if (pruned.length === 0) {
+    // Zero usable blocks — synthesise one from the bullet title and leave an
+    // empty tip placeholder so the educator has a prompt to fill in.
+    return [
+      { id: makeBlockId(), type: 'text', content: bulletText || '' },
+      { id: makeBlockId(), type: 'tip', content: '' },
+    ];
+  }
+  if (pruned.length === 1) {
+    // One block only — add an empty tip placeholder so every bullet has the
+    // text + teaching-layer shape the editor expects.
+    const type = pruned[0].type === 'tip' ? 'note' : 'tip';
+    pruned.push({ id: makeBlockId(), type, content: '' });
+  }
+  return pruned;
+}
+
 function outlineSectionToBlock(section) {
   const title = typeof section?.title === 'string' ? section.title.trim() : '';
   if (section?.type === 'expand') {
@@ -231,7 +265,11 @@ function outlineSectionToBlock(section) {
       if (typeof raw === 'string') {
         const text = raw.trim();
         if (!text) return null;
-        return { id: makeItemId(), text, blocks: [] };
+        return {
+          id: makeItemId(),
+          text,
+          blocks: hydrateBulletItemBlocks([], text),
+        };
       }
       if (raw && typeof raw === 'object') {
         const text =
@@ -241,10 +279,11 @@ function outlineSectionToBlock(section) {
               ? raw.text.trim()
               : '';
         if (!text && !Array.isArray(raw.blocks)) return null;
-        const blocks = Array.isArray(raw.blocks)
-          ? raw.blocks.map(normalizeNestedBlock)
-          : [];
-        return { id: makeItemId(), text, blocks };
+        return {
+          id: makeItemId(),
+          text,
+          blocks: hydrateBulletItemBlocks(raw.blocks, text),
+        };
       }
       return null;
     })
