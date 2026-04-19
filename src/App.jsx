@@ -8,6 +8,7 @@ import StyleComparison from './components/StyleComparison';
 import StyleMatchDialog from './components/StyleMatchDialog';
 import ExportModal from './components/ExportModal';
 import StructuredOutlineModal from './components/StructuredOutlineModal';
+import ExpansionPreviewModal from './components/ExpansionPreviewModal';
 import Dashboard from './components/Dashboard';
 import StudentPreview from './components/StudentPreview';
 import TeachMode from './components/TeachMode';
@@ -667,6 +668,8 @@ export default function App() {
   const [isStructuring, setIsStructuring] = useState(false);
   const [structuredOutline, setStructuredOutline] = useState(null);
   const [isOutlineModalOpen, setIsOutlineModalOpen] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
+  const [pendingExpansion, setPendingExpansion] = useState(null);
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
   const [pendingStyleMatch, setPendingStyleMatch] = useState(null);
   const [styleMatchDialogOpen, setStyleMatchDialogOpen] = useState(false);
@@ -1129,6 +1132,126 @@ export default function App() {
     recordChange('Replaced lesson with outline', structuredOutline.lessonTitle || '');
     setIsOutlineModalOpen(false);
   };
+
+  const handleExpandLesson = async () => {
+    if (isExpanding) return;
+    const lesson = lessons.find((l) => l.id === selectedLessonId);
+    if (!lesson) return;
+
+    // Only steps blocks carry bullet lists — serialize those for the API.
+    const sections = lesson.subBlocks
+      .filter((sb) => sb.type === 'steps')
+      .map((sb) => ({
+        title: sb.label || 'Section',
+        items: (sb.items || [])
+          .map((it) => (typeof it?.text === 'string' ? it.text.trim() : ''))
+          .filter(Boolean),
+      }))
+      .filter((s) => s.items.length > 0);
+
+    if (sections.length === 0) {
+      alert(
+        'This lesson has no bullet-style sections to expand. Use "Structure lesson" first, or add a Demo steps block.',
+      );
+      return;
+    }
+
+    setIsExpanding(true);
+    try {
+      const resp = await fetch('/api/expandLesson', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ sections }),
+      });
+      if (!resp.ok) {
+        const { error } = await resp.json().catch(() => ({}));
+        throw new Error(error || `Request failed: ${resp.status}`);
+      }
+      const data = await resp.json();
+      setPendingExpansion({
+        expansion: data,
+        lessonId: lesson.id,
+        lessonTitle: lesson.title || '',
+      });
+    } catch (err) {
+      console.error('Expand lesson failed:', err);
+      alert(`Could not expand lesson: ${err.message}`);
+    } finally {
+      setIsExpanding(false);
+    }
+  };
+
+  const handleApplyExpansion = () => {
+    if (!pendingExpansion) return;
+    const { expansion, lessonId } = pendingExpansion;
+    const expSections = Array.isArray(expansion?.sections) ? expansion.sections : [];
+    if (expSections.length === 0) {
+      setPendingExpansion(null);
+      return;
+    }
+
+    // For each expanded section, build a text block and slot it in right
+    // after the matching steps block (matched by label, case-insensitive).
+    const newBlocks = expSections.map((s) => {
+      const items = Array.isArray(s?.items) ? s.items : [];
+      const content = items
+        .filter((i) => i && (i.bullet || i.expanded))
+        .map((i) => `${(i.bullet || '').trim()}\n${(i.expanded || '').trim()}`.trim())
+        .join('\n\n');
+      return {
+        block: {
+          id: makeBlockId(),
+          type: 'text',
+          label: `${(s.title || 'Section').trim()} — expanded`,
+          tint: BLOCK_TYPES.text.tint,
+          content,
+        },
+        sectionTitle: (s.title || '').trim().toLowerCase(),
+      };
+    });
+
+    let firstInsertedId = null;
+    setLessons((prev) =>
+      prev.map((l) => {
+        if (l.id !== lessonId) return l;
+        const next = [];
+        l.subBlocks.forEach((sb) => {
+          next.push(sb);
+          if (sb.type !== 'steps') return;
+          const match = newBlocks.find(
+            (nb) => nb.sectionTitle && nb.sectionTitle === (sb.label || '').trim().toLowerCase(),
+          );
+          if (match) {
+            next.push(match.block);
+            if (!firstInsertedId) firstInsertedId = match.block.id;
+          }
+        });
+        // Any expanded sections that didn't match a steps-block label get
+        // appended at the end so nothing is silently dropped.
+        const placedIds = new Set(next.map((b) => b.id));
+        newBlocks.forEach((nb) => {
+          if (!placedIds.has(nb.block.id)) {
+            next.push(nb.block);
+            if (!firstInsertedId) firstInsertedId = nb.block.id;
+          }
+        });
+        return { ...l, subBlocks: next };
+      }),
+    );
+    scrollToBlock(firstInsertedId);
+    recordChange('Expanded lesson to teach', pendingExpansion.lessonTitle || '');
+    setPendingExpansion(null);
+  };
+
+  const handleCancelExpansion = () => setPendingExpansion(null);
+
+  const canExpandSelected = (() => {
+    const l = lessons.find((x) => x.id === selectedLessonId);
+    if (!l) return false;
+    return l.subBlocks.some(
+      (sb) => sb.type === 'steps' && Array.isArray(sb.items) && sb.items.some((i) => i?.text?.trim()),
+    );
+  })();
 
   const handleGenerateCards = async (lessonId) => {
     if (generatingCardsForId) return;
@@ -2058,11 +2181,14 @@ export default function App() {
               onMatchStyle={handleMatchStyle}
               onAIAction={handleAIAction}
               onStructureLesson={handleStructureLesson}
+              onExpandLesson={handleExpandLesson}
               styleProfile={styleProfile}
               canMatchStyle={selectedLessonId !== null}
+              canExpand={canExpandSelected}
               isGenerating={isGenerating}
               isMatchingStyle={isMatchingStyle}
               isStructuring={isStructuring}
+              isExpanding={isExpanding}
               inFlightAIActions={inFlightAIActions}
               lastChange={lastChange}
             />
@@ -2104,6 +2230,14 @@ export default function App() {
           onInsertAll={handleInsertEntireOutline}
           onReplace={handleReplaceWithOutline}
           onClose={() => setIsOutlineModalOpen(false)}
+        />
+      )}
+      {pendingExpansion && (
+        <ExpansionPreviewModal
+          expansion={pendingExpansion.expansion}
+          lessonTitle={pendingExpansion.lessonTitle}
+          onApply={handleApplyExpansion}
+          onCancel={handleCancelExpansion}
         />
       )}
       {showOnboardingIntro && (

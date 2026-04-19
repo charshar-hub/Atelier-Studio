@@ -19,11 +19,14 @@ export default function AIPanel({
   onMatchStyle,
   onAIAction,
   onStructureLesson,
+  onExpandLesson,
   styleProfile,
   canMatchStyle,
+  canExpand,
   isGenerating,
   isMatchingStyle,
   isStructuring,
+  isExpanding,
   inFlightAIActions,
   lastChange,
 }) {
@@ -33,6 +36,7 @@ export default function AIPanel({
     'g-lesson': onGenerateLesson,
     'g-structure': onStructureLesson,
     'r-style': onMatchStyle,
+    'r-expand': onExpandLesson,
   };
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
     handlers[key] = onAIAction ? () => onAIAction(mode) : undefined;
@@ -40,14 +44,17 @@ export default function AIPanel({
 
   const disabledKeys = new Set();
   if (!canMatchStyle) {
-    // Style/refine actions and structure all target the selected lesson
+    // Style/refine actions, structure, and expand all target the selected lesson
     disabledKeys.add('r-style');
     disabledKeys.add('g-structure');
+    disabledKeys.add('r-expand');
     for (const key of Object.keys(ACTION_MODE_MAP)) disabledKeys.add(key);
   }
+  if (!canExpand) disabledKeys.add('r-expand');
   if (isGenerating) disabledKeys.add('g-lesson');
   if (isMatchingStyle) disabledKeys.add('r-style');
   if (isStructuring) disabledKeys.add('g-structure');
+  if (isExpanding) disabledKeys.add('r-expand');
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
     if (inFlight.has(mode)) disabledKeys.add(key);
   }
@@ -56,6 +63,7 @@ export default function AIPanel({
     'g-lesson': isGenerating ? 'Generating…' : undefined,
     'g-structure': isStructuring ? 'Structuring…' : undefined,
     'r-style': isMatchingStyle ? 'Applying style…' : undefined,
+    'r-expand': isExpanding ? 'Expanding…' : undefined,
   };
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
     if (inFlight.has(mode)) labelOverrides[key] = ACTION_LOADING_LABELS[key];
@@ -65,6 +73,7 @@ export default function AIPanel({
   if (isGenerating) loadingKeySet.add('g-lesson');
   if (isStructuring) loadingKeySet.add('g-structure');
   if (isMatchingStyle) loadingKeySet.add('r-style');
+  if (isExpanding) loadingKeySet.add('r-expand');
   for (const [key, mode] of Object.entries(ACTION_MODE_MAP)) {
     if (inFlight.has(mode)) loadingKeySet.add(key);
   }

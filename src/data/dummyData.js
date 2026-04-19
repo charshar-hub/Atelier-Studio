@@ -75,6 +75,7 @@ export const refineActions = [
   { key: 'r-style', label: 'Match my style', highlight: true },
   { key: 'r-tone', label: 'Rewrite in my tone' },
   { key: 'r-simplify', label: 'Simplify language' },
+  { key: 'r-expand', label: 'Expand to teach' },
 ];
 
 export const lastGenerated =

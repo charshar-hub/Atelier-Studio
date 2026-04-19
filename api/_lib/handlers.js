@@ -206,6 +206,51 @@ RULES FOR ALL MODES:
 
 Do not explain anything outside the JSON.`;
 
+const EXPAND_LESSON_SYSTEM_PROMPT = `You are an expert beauty educator.
+
+Your task is to expand structured lesson bullet points into full teaching content.
+
+---
+
+INPUT:
+A lesson with sections, where each section has a list of bullet points.
+
+---
+
+OUTPUT RULES:
+
+1. KEEP the exact structure — section titles stay the same, bullet order stays the same.
+2. DO NOT merge sections or bullets together.
+3. DO NOT turn everything into one long paragraph.
+4. For EACH bullet point:
+   - Expand it into a clear, concise explanation.
+   - Write in a teaching tone (like speaking to a student).
+   - 2–4 sentences per point.
+5. Do NOT add unnecessary fluff.
+6. Prioritise clarity and understanding.
+
+---
+
+OUTPUT FORMAT (STRICT JSON — no prose, no markdown fences):
+
+{
+  "sections": [
+    {
+      "title": "Section title (match input exactly)",
+      "items": [
+        {
+          "bullet": "Original bullet text (match input exactly)",
+          "expanded": "2–4 teaching sentences explaining this bullet."
+        }
+      ]
+    }
+  ]
+}
+
+Every section from the input must appear in the output with the same title and the same number of items, in the same order. Every item must include both "bullet" (verbatim) and "expanded" (non-empty).
+
+Do not explain anything outside the JSON.`;
+
 const STRUCTURE_LESSON_SYSTEM_PROMPT = `You are an expert beauty educator and course designer.
 
 Your task is NOT to write long paragraphs.
@@ -451,6 +496,25 @@ ${profileBlock}
 - Intensity: ${intensity}`;
 }
 
+function buildExpandLessonUserPrompt({ sections }) {
+  const list = Array.isArray(sections) ? sections : [];
+  if (list.length === 0) {
+    return 'No sections provided. Return {"sections": []}.';
+  }
+  const body = list
+    .map((s, i) => {
+      const title = typeof s?.title === 'string' && s.title.trim() ? s.title.trim() : `Section ${i + 1}`;
+      const items = Array.isArray(s?.items) ? s.items : [];
+      const bullets = items
+        .map((b, j) => `  ${j + 1}. ${typeof b === 'string' ? b.trim() : ''}`)
+        .filter((line) => line.replace(/^\s*\d+\.\s*/, '').length > 0)
+        .join('\n');
+      return `SECTION: ${title}\n${bullets || '  (no bullets)'}`;
+    })
+    .join('\n\n');
+  return `Lesson to expand:\n\n${body}\n\nReturn JSON only.`;
+}
+
 function buildStructureLessonUserPrompt({ topic, notes }) {
   const parts = [];
   if (topic && topic.trim()) parts.push(`Topic: ${topic.trim()}`);
@@ -544,5 +608,9 @@ export const HANDLERS = {
   structureLesson: {
     systemPrompt: STRUCTURE_LESSON_SYSTEM_PROMPT,
     buildUserPrompt: buildStructureLessonUserPrompt,
+  },
+  expandLesson: {
+    systemPrompt: EXPAND_LESSON_SYSTEM_PROMPT,
+    buildUserPrompt: buildExpandLessonUserPrompt,
   },
 };
