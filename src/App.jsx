@@ -1,3 +1,11 @@
+// Unconditional boot logs — run as soon as App.jsx is evaluated, before any
+// component renders. Placed at the file top so they emit even if a later
+// import throws. Do NOT wrap in any DEV/MODE guard.
+console.log('APP STARTED');
+console.log('ENV URL:', import.meta.env.VITE_SUPABASE_URL);
+console.log('ENV KEY:', import.meta.env.VITE_SUPABASE_ANON_KEY);
+console.log('ENV MODE:', import.meta.env.MODE);
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Topbar from './components/Topbar';
 import Sidebar from './components/Sidebar';
@@ -19,6 +27,22 @@ import Onboarding, { clearOnboardingDraft } from './components/Onboarding';
 import OnboardingIntro from './components/OnboardingIntro';
 import { isSupabaseConfigured } from './lib/supabase';
 import * as coursesApi from './lib/courses';
+import * as styleKitApi from './lib/styleKit';
+
+// Temporary: surface env + Supabase wiring so prod misconfig is visible.
+if (typeof window !== 'undefined') {
+  console.log('[env] MODE:', import.meta.env.MODE);
+  console.log('[env] VITE_SUPABASE_URL set:', Boolean(import.meta.env.VITE_SUPABASE_URL));
+  console.log('[env] VITE_SUPABASE_ANON_KEY set:', Boolean(import.meta.env.VITE_SUPABASE_ANON_KEY));
+  console.log('[env] isSupabaseConfigured:', isSupabaseConfigured);
+  if (!isSupabaseConfigured) {
+    console.error(
+      '[env] Supabase env vars are missing. Data will NOT persist. ' +
+        'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env (local) ' +
+        'and in Vercel → Project Settings → Environment Variables (prod).',
+    );
+  }
+}
 
 const BLOCK_TYPES = {
   text: { label: 'Text', defaultLabel: 'Notes', tint: '#B8936A' },
@@ -456,29 +480,6 @@ function migrateCourseContent(raw) {
   };
 }
 
-const STORAGE_KEYS = {
-  styleProfile: 'atelier.styleProfile',
-  styleSampleText: 'atelier.styleSampleText',
-};
-
-function loadFromStorage(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw === null) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function saveToStorage(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // ignore quota / access errors
-  }
-}
-
 const DEFAULT_META = {
   status: 'DRAFT',
   moduleNumber: 1,
@@ -505,55 +506,6 @@ function createDefaultContent() {
     lessons: [],
     overview: { ...DEFAULT_OVERVIEW },
   };
-}
-
-const mockLessonTemplates = [
-  {
-    title: 'Applying the lifting lotion',
-    duration: '10 MIN',
-    summary:
-      'Timing, thickness, and the gentle brushstroke that coaxes every lash into a clean, uniform curl.',
-    script: '"Thin, even coats — we\'re sculpting, not painting. Let the lotion do the work."',
-    demoSteps: '4 steps · apply, spread, set timer, monitor',
-    commonMistakes: 'Over-saturating the base and lifting too aggressively',
-    proTip: 'Warm the lotion briefly between gloved fingers for smoother flow',
-  },
-  {
-    title: 'Neutralizing & locking the curl',
-    duration: '7 MIN',
-    summary:
-      'How the neutralizer resets the disulfide bonds — and why patience in these four minutes defines the final look.',
-    script: '"This is where the lift becomes permanent. No rushing, no peeking."',
-    demoSteps: '3 steps · apply neutralizer, wait, remove cleanly',
-    commonMistakes: 'Wiping before the full setting time has elapsed',
-    proTip: 'Use a dry micro-swab to check tackiness at the 3-minute mark',
-  },
-  {
-    title: 'The final reveal & aftercare',
-    duration: '6 MIN',
-    summary:
-      'Removing the rod, nourishing the lash, and the aftercare script that keeps the lift gorgeous for weeks.',
-    script: '"Now — we lift the veil. Your client sees herself differently for the next six weeks."',
-    demoSteps: '3 steps · release rod, nourish, brief client',
-    commonMistakes: 'Skipping the nourishing serum to save time',
-    proTip: 'Send aftercare instructions by text before the client leaves',
-  },
-];
-
-function buildLessonFromTemplate(template, number) {
-  return normalizeLesson({
-    id: makeId(),
-    number,
-    title: template.title,
-    duration: template.duration,
-    summary: template.summary,
-    subBlocks: [
-      { label: 'Script', content: template.script },
-      { label: 'Demo steps', content: template.demoSteps },
-      { label: 'Common mistakes', content: template.commonMistakes },
-      { label: 'Pro tip', content: template.proTip },
-    ],
-  });
 }
 
 function buildEmptyLesson(number, moduleId = '') {
@@ -798,12 +750,9 @@ export default function App() {
   // Builder UI state
   const [selectedLessonId, setSelectedLessonId] = useState(null);
   const [styleIndex, setStyleIndex] = useState(0);
-  const [styleProfile, setStyleProfile] = useState(() =>
-    migrateStyleProfile(loadFromStorage(STORAGE_KEYS.styleProfile, null)),
-  );
-  const [styleSampleText, setStyleSampleText] = useState(() =>
-    loadFromStorage(STORAGE_KEYS.styleSampleText, ''),
-  );
+  const [styleProfile, setStyleProfile] = useState(null);
+  const [styleSampleText, setStyleSampleText] = useState('');
+  const [styleKitLoaded, setStyleKitLoaded] = useState(false);
   const [saveStatus, setSaveStatus] = useState('idle');
   const [activeScreen, setActiveScreen] = useState('modules');
   const [canvasMode, setCanvasMode] = useState('editor');
@@ -831,15 +780,53 @@ export default function App() {
 
   const saveTimerRef = useRef(null);
   const skipNextSaveRef = useRef(false);
+  const styleKitSaveTimerRef = useRef(null);
 
-  // ——— Style profile / sample text persistence (local, user-level) ———
+  // ——— Style Kit: hydrate from Supabase on mount ———
   useEffect(() => {
-    saveToStorage(STORAGE_KEYS.styleProfile, styleProfile);
-  }, [styleProfile]);
+    if (!isSupabaseConfigured) {
+      setStyleKitLoaded(true);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { profile, sampleText } = await styleKitApi.fetchStyleKit();
+        console.log('[styleKit] loaded from Supabase:', { hasProfile: Boolean(profile), sampleChars: sampleText.length });
+        if (cancelled) return;
+        setStyleProfile(migrateStyleProfile(profile));
+        setStyleSampleText(sampleText || '');
+      } catch (err) {
+        console.error('[styleKit] load failed:', err);
+      } finally {
+        if (!cancelled) setStyleKitLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
+  // ——— Style Kit: debounced upsert to Supabase ———
+  // Only runs after the initial hydrate so we never overwrite the row with
+  // default empty state during the first render.
   useEffect(() => {
-    saveToStorage(STORAGE_KEYS.styleSampleText, styleSampleText);
-  }, [styleSampleText]);
+    if (!isSupabaseConfigured || !styleKitLoaded) return;
+    clearTimeout(styleKitSaveTimerRef.current);
+    styleKitSaveTimerRef.current = setTimeout(async () => {
+      try {
+        await styleKitApi.saveStyleKit({
+          profile: styleProfile,
+          sampleText: styleSampleText,
+        });
+      } catch (err) {
+        console.error('[styleKit] save failed:', err);
+      }
+    }, 600);
+    return () => clearTimeout(styleKitSaveTimerRef.current);
+  }, [styleProfile, styleSampleText, styleKitLoaded]);
+
+  useEffect(() => () => clearTimeout(styleKitSaveTimerRef.current), []);
 
   // ——— Course list (dashboard) ———
   const loadCourses = useCallback(async () => {
@@ -1177,14 +1164,11 @@ export default function App() {
       appendGeneratedLesson(data);
       recordChange('Generated a new lesson', data?.title || '');
     } catch (err) {
-      console.error('Generate lesson failed, falling back to mock:', err);
-      const fallbackModuleId = modules[modules.length - 1]?.id || '';
-      setLessons((prev) => {
-        const template = mockLessonTemplates[prev.length % mockLessonTemplates.length];
-        const fromTemplate = buildLessonFromTemplate(template, prev.length + 1);
-        return [...prev, { ...fromTemplate, moduleId: fallbackModuleId }];
-      });
-      recordChange('Generated a new lesson', '');
+      console.error('Generate lesson failed:', err);
+      alert(
+        `Could not generate lesson: ${err.message}\n\n` +
+          'Check that ANTHROPIC_API_KEY is set in your Vercel project settings.',
+      );
     } finally {
       setIsGenerating(false);
     }
