@@ -55,6 +55,10 @@
   --app-rgb-accent: 17 17 17;            /* --accent (black, not indigo) */
   --app-rgb-accent-deep: 0 0 0;
   --app-rgb-whisper: 229 231 235;        /* --border */
+
+  /* Inter everywhere on the homepage — SaaS look. The body default
+   * (Inter Tight) would otherwise cascade. */
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 [data-page='home'] .font-serif {
