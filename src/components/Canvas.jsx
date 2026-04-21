@@ -55,7 +55,13 @@ export default function Canvas({
   };
 
   return (
-    <main className="flex-1 overflow-y-auto px-14 py-10">
+    // data-surface="themed" adopts the active course theme inside the
+    // editor canvas. Topbar / Sidebar / AIPanel are siblings outside
+    // this element — they remain on the neutral AYUAI app palette.
+    <main
+      data-surface="themed"
+      className="flex-1 overflow-y-auto px-14 py-10"
+    >
       {showWelcomeBanner && (
         <div className="mb-10 animate-fade-up">
           <h2 className="font-serif text-[28px] italic leading-[1.25] tracking-tight text-ink">

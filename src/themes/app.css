@@ -86,6 +86,14 @@
   font-family: var(--font-body);
 }
 
+/* Card surfaces default to Tailwind's `bg-white` across the editor and
+ * preview. Within a themed scope, retarget them to --card-bg so lesson
+ * cards, block surfaces, popovers etc. follow the theme's card colour
+ * (white in most themes, #18181B in Minimal Dark, etc.). */
+[data-surface='themed'] .bg-white {
+  background-color: var(--card-bg);
+}
+
 /* Structural hooks — opt-in via data attributes so we don't globally
  * restyle every card across the whole app. */
 [data-surface='themed'] [data-themed-card] {
