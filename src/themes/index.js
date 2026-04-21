@@ -5,15 +5,14 @@
 // aesthetic, add a new file under src/themes/ and register it here.
 
 import { beautyPro } from './beauty-pro';
-import { minimalDark } from './minimal-dark';
+import { softDark } from './soft-dark';
 import { creatorClean } from './creator-clean';
 import { educationClassic } from './education-classic';
 import { wellnessCalm } from './wellness-calm';
 
-// Registry matches the canonical theme spec — five named themes only.
 export const THEMES = Object.freeze({
   'beauty-pro': beautyPro,
-  'minimal-dark': minimalDark,
+  'soft-dark': softDark,
   'creator-clean': creatorClean,
   'education-classic': educationClassic,
   'wellness-calm': wellnessCalm,
@@ -22,11 +21,24 @@ export const THEMES = Object.freeze({
 // Ordered for UI pickers.
 export const THEME_LIST = Object.freeze([
   beautyPro,
-  minimalDark,
+  softDark,
   creatorClean,
   educationClassic,
   wellnessCalm,
 ]);
+
+// Legacy id → current id. Keeps existing courses (saved before a
+// rename) pointing at the right theme. Consulted in App.jsx when
+// loading a course.
+const LEGACY_THEME_IDS = Object.freeze({
+  'minimal-dark': 'soft-dark',
+});
+
+export function resolveThemeId(id) {
+  if (!id) return null;
+  const migrated = LEGACY_THEME_IDS[id] || id;
+  return THEMES[migrated] ? migrated : null;
+}
 
 export const DEFAULT_THEME_ID = 'beauty-pro';
 

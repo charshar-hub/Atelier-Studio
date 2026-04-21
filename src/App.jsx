@@ -46,6 +46,7 @@ import {
   applyTheme,
   applyMode,
   loadStoredMode,
+  resolveThemeId,
   DEFAULT_THEME_ID,
   THEMES,
 } from './themes';
@@ -434,9 +435,10 @@ export default function App() {
     setActiveScreen('modules');
     setSaveStatus('saved');
     setLastChange(null);
-    // Apply the course's saved theme (falls back to default).
-    const savedTheme = course.content?.themeId;
-    const nextThemeId = savedTheme && THEMES[savedTheme] ? savedTheme : DEFAULT_THEME_ID;
+    // Apply the course's saved theme. resolveThemeId handles legacy ids
+    // (e.g. 'minimal-dark' → 'soft-dark' after the rename) so older
+    // courses keep loading on the correct theme.
+    const nextThemeId = resolveThemeId(course.content?.themeId) || DEFAULT_THEME_ID;
     setThemeId(nextThemeId);
     applyTheme(nextThemeId);
     setView('builder');

@@ -1,0 +1,43 @@
+/* Soft Dark — calm, modern dark course theme. No pure black and no
+ * pure white text. Subtle card surfaces with 1px borders instead of
+ * drop shadows. */
+
+:root[data-theme='soft-dark'],
+[data-theme='soft-dark'] [data-surface='themed'] {
+  --bg-primary: #1c1d21;
+  --bg-secondary: #23252b;
+  --text-primary: #e8eaf0;
+  --text-secondary: #a1a6b3;
+  --accent: #ffffff;
+  --border: #343741;
+  --card-bg: #2a2d34;
+
+  --font-heading: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --h1-size: 44px;
+  --h2-size: 28px;
+  --body-size: 15px;
+  --line-height: 1.65;
+
+  --section-padding: 32px;
+  --block-gap: 16px;
+  --card-padding: 20px;
+
+  /* Cards lean on border + subtle elevation via the card-bg tier,
+   * never drop shadow. */
+  --radius: 8px;
+  --shadow: none;
+  --border-style: 1px solid var(--border);
+
+  /* RGB channels — Tailwind utilities via rgb(<channels>/<alpha>). */
+  --bp-rgb-canvas: 28 29 33;
+  --bp-rgb-paper: 35 37 43;
+  --bp-rgb-ink: 232 234 240;
+  --bp-rgb-ink-soft: 161 166 179;
+  --bp-rgb-ink-muted: 161 166 179;
+  --bp-rgb-ink-faint: 132 137 150;
+  --bp-rgb-accent: 255 255 255;
+  --bp-rgb-accent-deep: 232 234 240;
+  --bp-rgb-rose: 248 113 113;
+  --bp-rgb-whisper: 52 55 65;
+}
