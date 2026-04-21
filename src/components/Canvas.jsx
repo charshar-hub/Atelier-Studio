@@ -20,6 +20,7 @@ export default function Canvas({
   onDeleteBlock,
   onDuplicateBlock,
   onReorderBlock,
+  onConvertToSplit,
   onAddModule,
   onUpdateModule,
   onRemoveModule,
@@ -100,6 +101,7 @@ export default function Canvas({
                 onDeleteBlock={onDeleteBlock}
                 onDuplicateBlock={onDuplicateBlock}
                 onReorderBlock={onReorderBlock}
+                onConvertToSplit={onConvertToSplit}
                 onUpdateModule={onUpdateModule}
                 onRemoveModule={moduleList.length > 1 ? onRemoveModule : undefined}
                 onGenerateCards={onGenerateCards}
@@ -238,6 +240,7 @@ function ModuleSection({
   onDeleteBlock,
   onDuplicateBlock,
   onReorderBlock,
+  onConvertToSplit,
   onUpdateModule,
   onRemoveModule,
   onGenerateCards,
@@ -268,6 +271,7 @@ function ModuleSection({
           onDeleteBlock={onDeleteBlock}
           onDuplicateBlock={onDuplicateBlock}
           onReorderBlock={onReorderBlock}
+          onConvertToSplit={onConvertToSplit}
           onGenerateCards={
             onGenerateCards ? () => onGenerateCards(lesson.id) : undefined
           }
@@ -348,6 +352,7 @@ function LessonCard({
   onDeleteBlock,
   onDuplicateBlock,
   onReorderBlock,
+  onConvertToSplit,
   onGenerateCards,
   isGeneratingCards,
   anyGeneratingCards,
@@ -462,8 +467,30 @@ function LessonCard({
                     onChange={(patch) =>
                       onUpdateBlock && onUpdateBlock(lesson.id, block.id, patch)
                     }
+                    onDuplicate={
+                      onDuplicateBlock ? () => onDuplicateBlock(lesson.id, block.id) : undefined
+                    }
+                    onDelete={
+                      onDeleteBlock ? () => onDeleteBlock(lesson.id, block.id) : undefined
+                    }
                   />
                 </BlockShell>
+                {/* Smart suggestion: adjacent image+text (or text+image) →
+                    offer to merge them into a split block. */}
+                <ConvertToSplitSuggestion
+                  current={block}
+                  next={blocks[index + 1]}
+                  onConvert={
+                    onConvertToSplit
+                      ? () =>
+                          onConvertToSplit(
+                            lesson.id,
+                            block.id,
+                            blocks[index + 1].id,
+                          )
+                      : undefined
+                  }
+                />
                 <AddBlockRow
                   open={pickerAt === index + 1}
                   onToggle={() =>
@@ -576,6 +603,39 @@ function DurationField({ value, onChange }) {
       >
         {value || '— min'}
       </span>
+    </div>
+  );
+}
+
+// Inline suggestion shown between two adjacent blocks when the pair looks
+// like it would read better side-by-side (image + prose block). Clicking
+// merges them into a single Split block. The suggestion is subtle — only
+// renders when the heuristic matches and `onConvert` is provided.
+function ConvertToSplitSuggestion({ current, next, onConvert }) {
+  if (!current || !next || !onConvert) return null;
+
+  const a = current.type;
+  const b = next.type;
+  const textish = (t) => t === 'text' || t === 'heading' || t === 'tip' || t === 'callout';
+
+  // Match image + text (either order). Skip when either block is empty so
+  // we don't nag on placeholders.
+  const matches =
+    (a === 'image' && textish(b) && current.content?.src) ||
+    (textish(a) && b === 'image' && next.content?.src);
+  if (!matches) return null;
+
+  return (
+    <div className="flex items-center justify-center py-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+      <button
+        type="button"
+        onClick={onConvert}
+        className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-paper/60 px-3 py-1 text-[11px] tracking-wide text-ink-soft transition hover:border-accent hover:bg-paper hover:text-ink"
+        title="Merge these two blocks into a 2-column layout"
+      >
+        <span aria-hidden="true">↔</span>
+        <span>Convert to side-by-side</span>
+      </button>
     </div>
   );
 }

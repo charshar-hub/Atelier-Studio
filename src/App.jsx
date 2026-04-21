@@ -1159,6 +1159,32 @@ export default function App() {
     recordChange(`Added ${type} block`);
   };
 
+  // Merge two adjacent blocks (typically an image + prose pair) into a
+  // single 2-column split block. `aId` becomes the left column, `bId` the
+  // right, preserving reading order. Surfaced via the "Convert to
+  // side-by-side" suggestion in the canvas.
+  const handleConvertToSplit = (lessonId, aId, bId) => {
+    setLessons((prev) =>
+      prev.map((l) => {
+        if (l.id !== lessonId) return l;
+        const aIdx = l.blocks.findIndex((b) => b.id === aId);
+        const bIdx = l.blocks.findIndex((b) => b.id === bId);
+        if (aIdx === -1 || bIdx === -1 || bIdx !== aIdx + 1) return l;
+        const a = l.blocks[aIdx];
+        const b = l.blocks[bIdx];
+        const split = makeBlock('split');
+        split.content = {
+          ...split.content,
+          columns: [{ blocks: [a] }, { blocks: [b] }],
+        };
+        const next = [...l.blocks];
+        next.splice(aIdx, 2, split);
+        return { ...l, blocks: next };
+      }),
+    );
+    recordChange('Converted to side-by-side');
+  };
+
   const handleReorderBlock = (lessonId, fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
     setLessons((prev) =>
@@ -1784,6 +1810,7 @@ export default function App() {
               onDeleteBlock={handleDeleteBlock}
               onDuplicateBlock={handleDuplicateBlock}
               onReorderBlock={handleReorderBlock}
+              onConvertToSplit={handleConvertToSplit}
               onAddModule={handleAddModule}
               onUpdateModule={handleUpdateModule}
               onRemoveModule={handleRemoveModule}

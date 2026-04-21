@@ -47,7 +47,13 @@ export const SPLIT_CHILD_TYPES = [
 
 export const SPLIT_RATIOS = ['50-50', '40-60', '60-40', '30-70', '70-30'];
 
+// Visual style for a split: 'default' (plain side-by-side),
+// 'comparison' (labeled Before/After above each column), 'slider'
+// (overlay with draggable divider, first image per column is used).
+export const SPLIT_MODES = ['default', 'comparison', 'slider'];
+
 export const IMAGE_WIDTHS = ['small', 'medium', 'large', 'full'];
+export const IMAGE_FITS = ['cover', 'contain'];
 
 let _idCounter = 0;
 function nextSuffix() {
@@ -66,7 +72,7 @@ export function makeItemId() {
 function emptyContentFor(type) {
   switch (type) {
     case 'image':
-      return { src: '', caption: '', width: 'full' };
+      return { src: '', caption: '', width: 'full', fit: 'cover' };
     case 'video':
       return { url: '', caption: '' };
     case 'checklist':
@@ -77,6 +83,8 @@ function emptyContentFor(type) {
     case 'split':
       return {
         ratio: '50-50',
+        mode: 'default',
+        labels: { left: '', right: '' },
         columns: [{ blocks: [] }, { blocks: [] }],
       };
     default:
@@ -113,6 +121,7 @@ export function normalizeBlock(raw) {
           src: typeof c.src === 'string' ? c.src : '',
           caption: typeof c.caption === 'string' ? c.caption : '',
           width: IMAGE_WIDTHS.includes(c.width) ? c.width : 'full',
+          fit: IMAGE_FITS.includes(c.fit) ? c.fit : 'cover',
         },
       };
     }
@@ -152,6 +161,12 @@ export function normalizeBlock(raw) {
     case 'split': {
       const c = raw.content || {};
       const ratio = SPLIT_RATIOS.includes(c.ratio) ? c.ratio : '50-50';
+      const mode = SPLIT_MODES.includes(c.mode) ? c.mode : 'default';
+      const rawLabels = c.labels || {};
+      const labels = {
+        left: typeof rawLabels.left === 'string' ? rawLabels.left : '',
+        right: typeof rawLabels.right === 'string' ? rawLabels.right : '',
+      };
       const rawCols = Array.isArray(c.columns) ? c.columns : [];
       // Always exactly two columns. Extras dropped, missing filled with empty.
       const columns = [0, 1].map((i) => {
@@ -165,7 +180,7 @@ export function normalizeBlock(raw) {
             .filter((b) => b.type !== 'split'),
         };
       });
-      return { ...base, content: { ratio, columns } };
+      return { ...base, content: { ratio, mode, labels, columns } };
     }
     default:
       return {
@@ -268,6 +283,8 @@ export function cloneBlock(block) {
         id,
         content: {
           ratio: c.ratio || '50-50',
+          mode: c.mode || 'default',
+          labels: { ...(c.labels || { left: '', right: '' }) },
           columns: (c.columns || []).map((col) => ({
             blocks: (col.blocks || []).map(cloneBlock),
           })),

@@ -217,8 +217,9 @@ export function DividerBlock() {
 
 // Image: supports both upload AND URL paste.
 export function ImageBlock({ block, onChange }) {
-  const content = block.content || { src: '', caption: '', width: 'full' };
+  const content = block.content || { src: '', caption: '', width: 'full', fit: 'cover' };
   const [urlDraft, setUrlDraft] = useState('');
+  const [replaceMode, setReplaceMode] = useState(false);
   const inputRef = useRef(null);
 
   const updateImage = (patch) => onChange({ content: { ...content, ...patch } });
@@ -228,18 +229,23 @@ export function ImageBlock({ block, onChange }) {
     if (!trimmed) return;
     updateImage({ src: trimmed });
     setUrlDraft('');
+    setReplaceMode(false);
   };
 
-  if (!content.src) {
+  const needsUpload = !content.src || replaceMode;
+  if (needsUpload) {
     return (
       <div className="rounded-lg border border-dashed border-whisper bg-paper/30 p-4">
         <ImageUploader
           image={{ src: '', width: content.width }}
-          onChange={(img) => updateImage({ src: img.src, width: img.width || 'full' })}
+          onChange={(img) => {
+            updateImage({ src: img.src, width: img.width || 'full' });
+            setReplaceMode(false);
+          }}
           onRemove={() => updateImage({ src: '' })}
           showSizePicker={false}
           compact
-          placeholder="Upload image"
+          placeholder={content.src ? 'Upload a replacement' : 'Upload image'}
         />
         <div className="mt-2 flex gap-2">
           <input
@@ -265,25 +271,45 @@ export function ImageBlock({ block, onChange }) {
             Add
           </button>
         </div>
+        {content.src && (
+          <button
+            type="button"
+            onClick={() => setReplaceMode(false)}
+            className="mt-2 text-[11px] text-ink-muted hover:text-ink"
+          >
+            Cancel
+          </button>
+        )}
       </div>
     );
   }
+
+  const objectFitClass = content.fit === 'contain' ? 'object-contain' : 'object-cover';
 
   return (
     <figure className="group/img relative">
       <img
         src={content.src}
         alt={content.caption || ''}
-        className={`rounded-lg ${imageWidthClass(content.width)}`}
+        className={`rounded-lg ${imageWidthClass(content.width)} ${objectFitClass}`}
       />
-      <button
-        type="button"
-        onClick={() => updateImage({ src: '' })}
-        className="absolute right-2 top-2 flex h-7 items-center gap-1 rounded-md bg-ink/85 px-2 text-[11px] tracking-wide text-canvas opacity-0 transition group-hover/img:opacity-100"
-      >
-        Remove
-      </button>
-      <div className="mt-1.5 flex items-center gap-3">
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover/img:opacity-100">
+        <button
+          type="button"
+          onClick={() => setReplaceMode(true)}
+          className="flex h-7 items-center rounded-md bg-ink/85 px-2 text-[11px] tracking-wide text-canvas hover:bg-ink"
+        >
+          Replace
+        </button>
+        <button
+          type="button"
+          onClick={() => updateImage({ src: '' })}
+          className="flex h-7 items-center rounded-md bg-ink/85 px-2 text-[11px] tracking-wide text-canvas hover:bg-ink"
+        >
+          Remove
+        </button>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-3">
         <select
           value={content.width}
           onChange={(e) => updateImage({ width: e.target.value })}
@@ -294,6 +320,29 @@ export function ImageBlock({ block, onChange }) {
           <option value="large">Large</option>
           <option value="full">Full</option>
         </select>
+        {/* Fit: cover crops to fill the box; contain letterboxes the whole image. */}
+        <div className="inline-flex items-center rounded border border-whisper bg-white p-0.5">
+          <button
+            type="button"
+            onClick={() => updateImage({ fit: 'cover' })}
+            className={`rounded px-2 py-0.5 text-[11px] tracking-wide transition ${
+              content.fit === 'cover' ? 'bg-ink text-canvas' : 'text-ink-muted hover:text-ink'
+            }`}
+            title="Fill the frame, cropping if needed"
+          >
+            Fill
+          </button>
+          <button
+            type="button"
+            onClick={() => updateImage({ fit: 'contain' })}
+            className={`rounded px-2 py-0.5 text-[11px] tracking-wide transition ${
+              content.fit === 'contain' ? 'bg-ink text-canvas' : 'text-ink-muted hover:text-ink'
+            }`}
+            title="Fit the whole image, even if it leaves space"
+          >
+            Fit
+          </button>
+        </div>
         <input
           type="text"
           value={content.caption || ''}
@@ -597,24 +646,39 @@ function SplitChildPicker({ onPick, onClose }) {
   );
 }
 
-export function SplitBlock({ block, onChange }) {
-  const content = block.content || { ratio: '50-50', columns: [{ blocks: [] }, { blocks: [] }] };
-  const { ratio, columns } = content;
+export function SplitBlock({ block, onChange, onDuplicate, onDelete }) {
+  const content = block.content || {
+    ratio: '50-50',
+    mode: 'default',
+    labels: { left: '', right: '' },
+    columns: [{ blocks: [] }, { blocks: [] }],
+  };
+  const { ratio, mode = 'default', labels = { left: '', right: '' }, columns } = content;
 
-  // Empty split (new block) — show the three variant presets so users can
-  // bootstrap quickly. Once either column has a child, drop the picker.
   const isEmpty =
     (columns[0]?.blocks?.length ?? 0) === 0 && (columns[1]?.blocks?.length ?? 0) === 0;
 
-  const patchContent = (patch) =>
-    onChange({ content: { ...content, ...patch } });
+  const patchContent = (patch) => onChange({ content: { ...content, ...patch } });
 
   const applyVariant = (variant) => patchContent(variant.build());
 
   const setRatio = (r) => patchContent({ ratio: r });
+  const setMode = (m) => {
+    // Switching to comparison seeds default labels if they're blank.
+    if (m === 'comparison' && !labels.left && !labels.right) {
+      patchContent({ mode: m, labels: { left: 'Before', right: 'After' } });
+    } else {
+      patchContent({ mode: m });
+    }
+  };
+  const setLabel = (side, value) =>
+    patchContent({ labels: { ...labels, [side]: value } });
 
   const swapColumns = () =>
-    patchContent({ columns: [columns[1] || { blocks: [] }, columns[0] || { blocks: [] }] });
+    patchContent({
+      columns: [columns[1] || { blocks: [] }, columns[0] || { blocks: [] }],
+      labels: { left: labels.right, right: labels.left },
+    });
 
   const updateColumn = (colIdx, nextBlocks) => {
     const nextColumns = columns.map((col, i) =>
@@ -680,69 +744,265 @@ export function SplitBlock({ block, onChange }) {
   const gridStyle = useSplitGridStyle(ratio);
 
   return (
-    <div className="rounded-lg border border-whisper bg-paper/20 p-3">
-      {/* Toolbar */}
-      <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
-        <span className="text-[10px] uppercase tracking-[0.22em]">Split layout</span>
-        <span className="mx-1 h-3 w-px bg-whisper" />
-        <label className="flex items-center gap-1">
-          <span>Ratio</span>
-          <select
-            value={ratio}
-            onChange={(e) => setRatio(e.target.value)}
-            className="rounded border border-whisper bg-white px-1.5 py-0.5 text-[11px] text-ink focus:outline-none"
-          >
-            {SPLIT_RATIOS.map((r) => (
-              <option key={r} value={r}>
-                {r.replace('-', ' / ')}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          onClick={swapColumns}
-          className="ml-auto rounded-md border border-whisper bg-white px-2 py-0.5 text-[11px] text-ink-soft hover:bg-paper hover:text-ink"
-        >
-          Swap columns ⇄
-        </button>
-      </div>
+    <div className="group/split relative rounded-lg border border-whisper bg-paper/20 focus-within:border-accent/40 focus-within:shadow-[0_0_0_3px_rgba(184,147,106,0.08)]">
+      {/* Floating contextual toolbar — appears on hover OR when a child is
+          focused. Sits above the block, Notion-style. */}
+      <SplitFloatingToolbar
+        ratio={ratio}
+        mode={mode}
+        onRatio={setRatio}
+        onMode={setMode}
+        onSwap={swapColumns}
+        onDuplicate={onDuplicate}
+        onDelete={onDelete}
+      />
 
-      {/* Variant presets (only when empty) */}
-      {isEmpty && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {SPLIT_VARIANTS.map((v) => (
-            <button
-              key={v.key}
-              type="button"
-              onClick={() => applyVariant(v)}
-              className="rounded-md border border-whisper bg-white px-2.5 py-1 text-[11px] text-ink-soft transition hover:border-accent/40 hover:bg-paper hover:text-ink"
-              title={v.hint}
-            >
-              {v.label}
-            </button>
+      <div className="p-4">
+        {/* Variant presets (only when empty) */}
+        {isEmpty && (
+          <>
+            <div className="mb-3 text-[10px] uppercase tracking-[0.22em] text-ink-muted">
+              Start with a template
+            </div>
+            <div className="mb-4 grid grid-cols-1 gap-2 md:grid-cols-3">
+              {SPLIT_VARIANTS.map((v) => (
+                <button
+                  key={v.key}
+                  type="button"
+                  onClick={() => applyVariant(v)}
+                  className="rounded-md border border-whisper bg-white px-3 py-2.5 text-left transition hover:border-accent/40 hover:bg-paper"
+                >
+                  <div className="text-[12.5px] font-medium text-ink">{v.label}</div>
+                  <div className="mt-0.5 text-[11px] text-ink-muted">{v.hint}</div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Comparison mode: editable labels above each column */}
+        {mode === 'comparison' && !isEmpty && (
+          <div className="mb-2 grid gap-3" style={gridStyle}>
+            {['left', 'right'].map((side) => (
+              <input
+                key={side}
+                type="text"
+                value={labels[side]}
+                onChange={(e) => setLabel(side, e.target.value)}
+                placeholder={side === 'left' ? 'Before' : 'After'}
+                className="rounded-md bg-transparent px-2 py-1 text-center text-[11px] uppercase tracking-[0.22em] text-ink-soft placeholder:normal-case placeholder:tracking-normal placeholder:italic placeholder:text-ink-faint hover:bg-paper/40 focus:bg-paper/60 focus:outline-none"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Slider mode renders an overlay of the two first images. The
+            regular column editors still render below so the user can edit
+            the images / text that feed the slider. */}
+        {mode === 'slider' && !isEmpty && <ComparisonSlider columns={columns} labels={labels} />}
+
+        {/* Columns — grid on md+, stacks vertically on mobile */}
+        <div className="grid gap-3" style={gridStyle}>
+          {columns.map((col, colIdx) => (
+            <SplitColumn
+              key={colIdx}
+              colIdx={colIdx}
+              blocks={col.blocks || []}
+              onInsert={(idx, type) => insertChild(colIdx, idx, type)}
+              onUpdateChild={(childId, patch) => updateChild(colIdx, childId, patch)}
+              onDeleteChild={(childId) => deleteChild(colIdx, childId)}
+              onDuplicateChild={(childId) => duplicateChild(colIdx, childId)}
+              onMoveToOther={(childId) => moveChildToOtherColumn(colIdx, childId)}
+              onReorder={(from, to) => reorderChild(colIdx, from, to)}
+            />
           ))}
         </div>
-      )}
-
-      {/* Columns — grid on md+, stacks vertically on mobile (see useSplitGridStyle) */}
-      <div className="grid gap-3" style={gridStyle}>
-        {columns.map((col, colIdx) => (
-          <SplitColumn
-            key={colIdx}
-            colIdx={colIdx}
-            blocks={col.blocks || []}
-            onInsert={(idx, type) => insertChild(colIdx, idx, type)}
-            onUpdateChild={(childId, patch) => updateChild(colIdx, childId, patch)}
-            onDeleteChild={(childId) => deleteChild(colIdx, childId)}
-            onDuplicateChild={(childId) => duplicateChild(colIdx, childId)}
-            onMoveToOther={(childId) => moveChildToOtherColumn(colIdx, childId)}
-            onReorder={(from, to) => reorderChild(colIdx, from, to)}
-          />
-        ))}
       </div>
     </div>
   );
+}
+
+// Contextual toolbar pinned to the top of a split block. Only visible on
+// hover or focus-within — matches Notion/Canva contextual controls.
+function SplitFloatingToolbar({ ratio, mode, onRatio, onMode, onSwap, onDuplicate, onDelete }) {
+  return (
+    <div className="pointer-events-none absolute -top-10 left-1/2 z-10 -translate-x-1/2 opacity-0 transition-opacity group-hover/split:opacity-100 group-focus-within/split:opacity-100">
+      <div className="pointer-events-auto flex items-center gap-1 rounded-lg border border-whisper bg-white px-1.5 py-1 shadow-[0_4px_16px_-6px_rgba(58,46,38,0.18)]">
+        <ToolbarButton onClick={onSwap} title="Swap columns">
+          <span className="text-[13px] leading-none">⇄</span>
+        </ToolbarButton>
+        <ToolbarDivider />
+        <ToolbarSelect
+          value={ratio}
+          onChange={onRatio}
+          options={SPLIT_RATIOS.map((r) => ({ value: r, label: r.replace('-', ' / ') }))}
+          title="Column ratio"
+        />
+        <ToolbarDivider />
+        <ToolbarSelect
+          value={mode}
+          onChange={onMode}
+          options={[
+            { value: 'default', label: 'Default' },
+            { value: 'comparison', label: 'Comparison' },
+            { value: 'slider', label: 'Slider' },
+          ]}
+          title="Layout style"
+        />
+        {(onDuplicate || onDelete) && <ToolbarDivider />}
+        {onDuplicate && (
+          <ToolbarButton onClick={onDuplicate} title="Duplicate block">
+            <span className="text-[11px] tracking-wide">Duplicate</span>
+          </ToolbarButton>
+        )}
+        {onDelete && (
+          <ToolbarButton onClick={onDelete} title="Delete block" variant="danger">
+            <span className="text-[11px] tracking-wide">Delete</span>
+          </ToolbarButton>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ToolbarButton({ onClick, title, variant = 'default', children }) {
+  const base = 'flex h-7 items-center rounded-md px-2 transition';
+  const tone =
+    variant === 'danger'
+      ? 'text-rose hover:bg-rose/10'
+      : 'text-ink-soft hover:bg-paper hover:text-ink';
+  return (
+    <button type="button" onClick={onClick} title={title} className={`${base} ${tone}`}>
+      {children}
+    </button>
+  );
+}
+
+function ToolbarDivider() {
+  return <span className="mx-0.5 h-4 w-px bg-whisper" />;
+}
+
+function ToolbarSelect({ value, onChange, options, title }) {
+  return (
+    <select
+      title={title}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="h-7 rounded-md bg-transparent px-1.5 text-[11px] text-ink-soft hover:bg-paper hover:text-ink focus:outline-none"
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// Before/After image slider. Finds the first image child in each column and
+// juxtaposes them, clipped to a user-adjustable percentage.
+function ComparisonSlider({ columns, labels }) {
+  const leftImg = findFirstImage(columns[0]?.blocks);
+  const rightImg = findFirstImage(columns[1]?.blocks);
+  const [pct, setPct] = useState(50);
+  const wrapRef = useRef(null);
+  const draggingRef = useRef(false);
+
+  const startDrag = (e) => {
+    draggingRef.current = true;
+    e.preventDefault();
+  };
+  const onMove = (clientX) => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const next = Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+    setPct(next);
+  };
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (draggingRef.current) onMove(e.clientX);
+    };
+    const onMouseUp = () => {
+      draggingRef.current = false;
+    };
+    const onTouchMove = (e) => {
+      if (draggingRef.current && e.touches[0]) onMove(e.touches[0].clientX);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('touchmove', onTouchMove);
+    window.addEventListener('touchend', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener('touchmove', onTouchMove);
+      window.removeEventListener('touchend', onMouseUp);
+    };
+  }, []);
+
+  if (!leftImg?.src || !rightImg?.src) {
+    return (
+      <div className="mb-3 rounded-md border border-dashed border-whisper bg-white/60 px-4 py-3 text-center text-[12px] italic text-ink-muted">
+        Slider mode needs an image in each column.
+      </div>
+    );
+  }
+
+  return (
+    <figure className="mb-3">
+      <div
+        ref={wrapRef}
+        className="relative aspect-[16/9] w-full select-none overflow-hidden rounded-lg bg-black"
+      >
+        <img
+          src={rightImg.src}
+          alt={labels.right || 'After'}
+          className="absolute inset-0 h-full w-full object-cover"
+          draggable={false}
+        />
+        <div
+          className="absolute inset-y-0 left-0 overflow-hidden"
+          style={{ width: `${pct}%` }}
+        >
+          <img
+            src={leftImg.src}
+            alt={labels.left || 'Before'}
+            className="absolute inset-0 h-full w-full object-cover"
+            style={{ width: `${100 / (pct / 100 || 1)}%`, maxWidth: 'none' }}
+            draggable={false}
+          />
+        </div>
+        {(labels.left || labels.right) && (
+          <>
+            <span className="absolute left-2 top-2 rounded-full bg-ink/75 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-canvas">
+              {labels.left || 'Before'}
+            </span>
+            <span className="absolute right-2 top-2 rounded-full bg-ink/75 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-canvas">
+              {labels.right || 'After'}
+            </span>
+          </>
+        )}
+        <div
+          onMouseDown={startDrag}
+          onTouchStart={startDrag}
+          className="absolute inset-y-0 z-10 flex w-1 cursor-ew-resize items-center justify-center bg-canvas"
+          style={{ left: `calc(${pct}% - 2px)` }}
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-whisper bg-white shadow-[0_1px_6px_rgba(58,46,38,0.25)] text-ink-soft">
+            ⇔
+          </span>
+        </div>
+      </div>
+    </figure>
+  );
+}
+
+function findFirstImage(blocks) {
+  if (!Array.isArray(blocks)) return null;
+  const img = blocks.find((b) => b?.type === 'image' && b.content?.src);
+  return img ? img.content : null;
 }
 
 function SplitColumn({
@@ -756,6 +1016,7 @@ function SplitColumn({
   onReorder,
 }) {
   const [pickerAt, setPickerAt] = useState(null);
+  const [emptyPickerOpen, setEmptyPickerOpen] = useState(false);
   const [drag, setDrag] = useState({ fromIndex: -1, overIndex: -1 });
 
   const handleDragStart = (index) => (e) => {
@@ -776,8 +1037,39 @@ function SplitColumn({
   };
   const handleDragEnd = () => setDrag({ fromIndex: -1, overIndex: -1 });
 
+  // Empty column placeholder — a large, centered "+ Add content" card with
+  // an inline picker popover. Meant to feel inviting rather than incidental.
+  if (blocks.length === 0) {
+    return (
+      <div className="group/col relative flex min-h-[160px] items-center justify-center rounded-md border-2 border-dashed border-whisper bg-white/70 p-4 transition hover:border-accent/40">
+        <div className="mb-1 absolute left-3 top-2 text-[9px] uppercase tracking-[0.22em] text-ink-muted">
+          Column {colIdx + 1}
+        </div>
+        <button
+          type="button"
+          onClick={() => setEmptyPickerOpen(true)}
+          className="flex flex-col items-center gap-1.5 rounded-md px-4 py-3 text-ink-muted transition hover:text-ink"
+        >
+          <span className="flex h-8 w-8 items-center justify-center rounded-full border border-whisper bg-paper text-[18px] leading-none text-ink-soft">
+            +
+          </span>
+          <span className="text-[12.5px] tracking-wide">Add content</span>
+        </button>
+        {emptyPickerOpen && (
+          <SplitChildPicker
+            onPick={(type) => {
+              onInsert(0, type);
+              setEmptyPickerOpen(false);
+            }}
+            onClose={() => setEmptyPickerOpen(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-md border border-dashed border-whisper bg-white p-2.5">
+    <div className="group/col rounded-md border border-whisper bg-white p-3">
       <div className="mb-1 text-[9px] uppercase tracking-[0.22em] text-ink-muted">
         Column {colIdx + 1}
       </div>
@@ -825,12 +1117,6 @@ function SplitColumn({
             />
           </div>
         ))}
-
-        {blocks.length === 0 && (
-          <div className="rounded-md border border-dashed border-whisper/60 px-3 py-4 text-center text-[11px] italic text-ink-muted">
-            Empty column — click + to add a block.
-          </div>
-        )}
       </div>
     </div>
   );
@@ -952,8 +1238,10 @@ function SplitChildShell({
   );
 }
 
-// Dispatcher — used by the Canvas and student preview.
-export function BlockBody({ block, onChange, readOnly = false }) {
+// Dispatcher — used by the Canvas and student preview. Split blocks accept
+// optional onDuplicate/onDelete so the floating toolbar can mirror the
+// parent's block-level actions.
+export function BlockBody({ block, onChange, onDuplicate, onDelete, readOnly = false }) {
   if (!block) return null;
   if (readOnly) return <ReadOnlyBlock block={block} />;
 
@@ -975,7 +1263,14 @@ export function BlockBody({ block, onChange, readOnly = false }) {
     case 'checklist':
       return <ChecklistBlock block={block} onChange={onChange} />;
     case 'split':
-      return <SplitBlock block={block} onChange={onChange} />;
+      return (
+        <SplitBlock
+          block={block}
+          onChange={onChange}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+        />
+      );
     case 'divider':
       return <DividerBlock />;
     default:
@@ -1147,16 +1442,33 @@ export function ReadOnlyBlock({ block }) {
 function ReadOnlySplit({ block }) {
   const c = block.content || {};
   const cols = Array.isArray(c.columns) ? c.columns : [];
+  const labels = c.labels || { left: '', right: '' };
   const gridStyle = useSplitGridStyle(c.ratio);
+
   return (
-    <div className="grid gap-5" style={gridStyle}>
-      {cols.map((col, i) => (
-        <div key={i} className="space-y-3">
-          {(col.blocks || []).map((nb) => (
-            <ReadOnlyBlock key={nb.id} block={nb} />
+    <div className="space-y-3">
+      {c.mode === 'slider' && <ComparisonSlider columns={cols} labels={labels} />}
+      {c.mode === 'comparison' && (
+        <div className="grid gap-5" style={gridStyle}>
+          {['left', 'right'].map((side) => (
+            <div
+              key={side}
+              className="text-center text-[10px] uppercase tracking-[0.22em] text-ink-muted"
+            >
+              {labels[side] || (side === 'left' ? 'Before' : 'After')}
+            </div>
           ))}
         </div>
-      ))}
+      )}
+      <div className="grid gap-5" style={gridStyle}>
+        {cols.map((col, i) => (
+          <div key={i} className="space-y-3">
+            {(col.blocks || []).map((nb) => (
+              <ReadOnlyBlock key={nb.id} block={nb} />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
