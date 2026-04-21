@@ -16,6 +16,7 @@ import './themes/soft-dark.css';
 import './themes/creator-clean.css';
 import './themes/education-classic.css';
 import './themes/wellness-calm.css';
+import './themes/blush.css';
 import { applyTheme, applyMode, loadStoredMode } from './themes';
 
 // Beauty Pro is the frozen snapshot of the current aesthetic. Setting it

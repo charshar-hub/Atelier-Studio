@@ -1,0 +1,41 @@
+/* Blush — soft, premium baby-pink theme. Muted, calm, never saturated.
+ * Clean Inter typography, white cards with subtle pink-grey borders. */
+
+:root[data-theme='blush'],
+[data-theme='blush'] [data-surface='themed'] {
+  --bg-primary: #fdf7f9;
+  --bg-secondary: #f6ecef;
+  --text-primary: #2a1f23;
+  --text-secondary: #7a6a70;
+  --accent: #e8b4c0;
+  --border: #ead6dc;
+  --card-bg: #ffffff;
+
+  --font-heading: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --h1-size: 44px;
+  --h2-size: 28px;
+  --body-size: 16px;
+  --line-height: 1.7;
+
+  --section-padding: 48px;
+  --block-gap: 24px;
+  --card-padding: 24px;
+
+  /* Soft but definite: 12px radius, almost-no shadow, subtle pink border. */
+  --radius: 12px;
+  --shadow: 0 2px 16px rgba(42, 31, 35, 0.03);
+  --border-style: 1px solid var(--border);
+
+  /* RGB channels for Tailwind utility classes. */
+  --bp-rgb-canvas: 253 247 249;
+  --bp-rgb-paper: 246 236 239;
+  --bp-rgb-ink: 42 31 35;
+  --bp-rgb-ink-soft: 122 106 112;
+  --bp-rgb-ink-muted: 122 106 112;
+  --bp-rgb-ink-faint: 160 144 150;
+  --bp-rgb-accent: 232 180 192;
+  --bp-rgb-accent-deep: 208 148 164;
+  --bp-rgb-rose: 220 90 130;
+  --bp-rgb-whisper: 234 214 220;
+}

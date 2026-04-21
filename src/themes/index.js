@@ -9,6 +9,7 @@ import { softDark } from './soft-dark';
 import { creatorClean } from './creator-clean';
 import { educationClassic } from './education-classic';
 import { wellnessCalm } from './wellness-calm';
+import { blush } from './blush';
 
 export const THEMES = Object.freeze({
   'beauty-pro': beautyPro,
@@ -16,6 +17,7 @@ export const THEMES = Object.freeze({
   'creator-clean': creatorClean,
   'education-classic': educationClassic,
   'wellness-calm': wellnessCalm,
+  blush,
 });
 
 // Ordered for UI pickers.
@@ -25,6 +27,7 @@ export const THEME_LIST = Object.freeze([
   creatorClean,
   educationClassic,
   wellnessCalm,
+  blush,
 ]);
 
 // Legacy id → current id. Keeps existing courses (saved before a
