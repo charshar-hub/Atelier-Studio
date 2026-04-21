@@ -11,6 +11,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
 import './themes/beauty-pro.css';
+import './themes/editorial.css';
 import { applyTheme } from './themes';
 
 // Beauty Pro is the frozen snapshot of the current aesthetic. Setting it

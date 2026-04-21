@@ -11,6 +11,21 @@
 
 :root,
 [data-theme='beauty-pro'] {
+  /* RGB channels — the canonical form Tailwind resolves against. Keeping
+   * both `--bp-color-*` hex tokens (for JS / inline styles) and
+   * `--bp-rgb-*` channel tokens (for Tailwind's rgb(<channels>/<alpha>)
+   * pattern) means opacity modifiers like bg-paper/40 keep working. */
+  --bp-rgb-canvas: 250 246 240;
+  --bp-rgb-paper: 243 236 225;
+  --bp-rgb-ink: 43 33 24;
+  --bp-rgb-ink-soft: 90 74 63;
+  --bp-rgb-ink-muted: 138 118 102;
+  --bp-rgb-ink-faint: 138 118 102;
+  --bp-rgb-accent: 184 147 106;
+  --bp-rgb-accent-deep: 138 106 71;
+  --bp-rgb-rose: 212 168 154;
+  --bp-rgb-whisper: 232 223 210;
+
   /* Backgrounds */
   --bp-color-canvas: #faf6f0;
   --bp-color-paper: #f3ece1;

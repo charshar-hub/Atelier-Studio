@@ -1,3 +1,5 @@
+import { THEME_LIST } from '../themes';
+
 export default function Topbar({
   saveStatus = 'idle',
   onExport,
@@ -10,6 +12,8 @@ export default function Topbar({
   courseStatus = 'DRAFT',
   onChangeCourseTitle,
   onBackToDashboard,
+  themeId = 'beauty-pro',
+  onChangeTheme,
 }) {
   return (
     <header className="flex h-14 items-center border-b border-whisper bg-canvas px-5">
@@ -66,6 +70,9 @@ export default function Topbar({
       {/* Actions */}
       <div className="flex items-center justify-end">
         <SaveIndicator status={saveStatus} />
+        {onChangeTheme && (
+          <ThemeSelector themeId={themeId} onChange={onChangeTheme} />
+        )}
         {onChangeMode && <ModeToggle mode={mode} onChange={onChangeMode} />}
         <button
           onClick={onPresent}
@@ -89,6 +96,25 @@ export default function Topbar({
         </button>
       </div>
     </header>
+  );
+}
+
+function ThemeSelector({ themeId, onChange }) {
+  return (
+    <label className="mr-2 flex items-center gap-1.5" title="Course theme">
+      <span className="text-[10px] uppercase tracking-[0.18em] text-ink-muted">Theme</span>
+      <select
+        value={themeId}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-7 rounded-full border border-whisper bg-transparent px-2.5 text-[11px] tracking-wide text-ink-soft transition hover:bg-paper focus:outline-none"
+      >
+        {THEME_LIST.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 

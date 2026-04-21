@@ -42,6 +42,7 @@ import {
   buildBlocksFromExpandResponse,
   buildExpandSectionsFromBlocks,
 } from './lib/migrateLesson';
+import { applyTheme, DEFAULT_THEME_ID, THEMES } from './themes';
 
 // Temporary: surface env + Supabase wiring so prod misconfig is visible.
 if (typeof window !== 'undefined') {
@@ -300,6 +301,7 @@ export default function App() {
   const [modules, setModules] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [courseOverview, setCourseOverview] = useState(DEFAULT_OVERVIEW);
+  const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
 
   // Derived legacy meta (first module) for views that haven't been migrated.
   const moduleMeta = modules[0]
@@ -425,6 +427,11 @@ export default function App() {
     setActiveScreen('modules');
     setSaveStatus('saved');
     setLastChange(null);
+    // Apply the course's saved theme (falls back to default).
+    const savedTheme = course.content?.themeId;
+    const nextThemeId = savedTheme && THEMES[savedTheme] ? savedTheme : DEFAULT_THEME_ID;
+    setThemeId(nextThemeId);
+    applyTheme(nextThemeId);
     setView('builder');
   };
 
@@ -617,7 +624,7 @@ export default function App() {
       setSaveStatus('saving');
       await coursesApi.updateCourse(currentCourseId, {
         title: courseTitle,
-        content: { modules, lessons, overview: courseOverview },
+        content: { modules, lessons, overview: courseOverview, themeId },
       });
       setSaveStatus('saved');
     } catch (err) {
@@ -638,6 +645,8 @@ export default function App() {
     setIsExportOpen(false);
     setShowOnboardingIntro(false);
     setActiveScreen('modules');
+    setThemeId(DEFAULT_THEME_ID);
+    applyTheme(DEFAULT_THEME_ID);
   };
 
   // ——— Debounced Supabase save whenever course data changes ———
@@ -653,7 +662,7 @@ export default function App() {
       try {
         await coursesApi.updateCourse(currentCourseId, {
           title: courseTitle,
-          content: { modules, lessons, overview: courseOverview },
+          content: { modules, lessons, overview: courseOverview, themeId },
         });
         setSaveStatus('saved');
       } catch (err) {
@@ -662,7 +671,7 @@ export default function App() {
       }
     }, 900);
     return () => clearTimeout(saveTimerRef.current);
-  }, [currentCourseId, courseTitle, modules, lessons, courseOverview]);
+  }, [currentCourseId, courseTitle, modules, lessons, courseOverview, themeId]);
 
   useEffect(() => () => clearTimeout(saveTimerRef.current), []);
 
@@ -1588,6 +1597,16 @@ export default function App() {
     );
   };
 
+  // Instant theme swap: update state + DOM attribute in the same tick.
+  // Persistence happens via the existing debounced save (themeId is in the
+  // effect's dep array).
+  const handleChangeTheme = (nextId) => {
+    if (!THEMES[nextId]) return;
+    setThemeId(nextId);
+    applyTheme(nextId);
+    recordChange('Switched theme', THEMES[nextId].name);
+  };
+
   const handleUpdateCourseOverview = (patch) => {
     setCourseOverview((prev) => ({ ...prev, ...patch }));
   };
@@ -1749,6 +1768,8 @@ export default function App() {
         courseStatus={moduleMeta.status}
         onChangeCourseTitle={setCourseTitle}
         onBackToDashboard={handleBackToDashboard}
+        themeId={themeId}
+        onChangeTheme={handleChangeTheme}
       />
       <div className="flex flex-1 overflow-hidden">
         {!isTeachScreen && <Sidebar active={activeScreen} onSelect={setActiveScreen} />}

@@ -7,21 +7,21 @@ export default {
         sans: ['Inter Tight', 'system-ui', 'sans-serif'],
         serif: ['Cormorant Garamond', 'Georgia', 'serif'],
       },
+      // Colors resolve from --bp-rgb-* CSS variables so themes can swap by
+      // overriding the variables under [data-theme="<id>"]. The RGB channel
+      // form keeps Tailwind's /<alpha> opacity modifiers working.
+      // Defaults (Beauty Pro) live in src/themes/beauty-pro.css.
       colors: {
-        canvas: '#FAF6F0',
-        paper: '#F3ECE1',
-        // Typography hierarchy — three readable tiers over the warm paper background.
-        ink: '#2B2118', // primary — headings, key content
-        'ink-soft': '#5A4A3F', // secondary — descriptions, assistant text, italic body
-        'ink-muted': '#8A7666', // tertiary — placeholders, subtle labels
-        // ink-faint used to be #A3958A (too light). Now aliased to the tertiary
-        // tier so the hundreds of `text-ink-faint` usages across the app lift
-        // to readable contrast without a codebase-wide rename.
-        'ink-faint': '#8A7666',
-        accent: '#B8936A',
-        'accent-deep': '#8A6A47',
-        rose: '#D4A89A',
-        whisper: '#E8DFD2',
+        canvas: 'rgb(var(--bp-rgb-canvas) / <alpha-value>)',
+        paper: 'rgb(var(--bp-rgb-paper) / <alpha-value>)',
+        ink: 'rgb(var(--bp-rgb-ink) / <alpha-value>)',
+        'ink-soft': 'rgb(var(--bp-rgb-ink-soft) / <alpha-value>)',
+        'ink-muted': 'rgb(var(--bp-rgb-ink-muted) / <alpha-value>)',
+        'ink-faint': 'rgb(var(--bp-rgb-ink-faint) / <alpha-value>)',
+        accent: 'rgb(var(--bp-rgb-accent) / <alpha-value>)',
+        'accent-deep': 'rgb(var(--bp-rgb-accent-deep) / <alpha-value>)',
+        rose: 'rgb(var(--bp-rgb-rose) / <alpha-value>)',
+        whisper: 'rgb(var(--bp-rgb-whisper) / <alpha-value>)',
       },
       keyframes: {
         'fade-up': {

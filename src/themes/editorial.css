@@ -1,0 +1,32 @@
+/* Editorial — brighter, cooler, terracotta-accented theme.
+ * Overrides the Beauty Pro tokens while sharing the same variable names,
+ * so every Tailwind color class retargets automatically. */
+
+[data-theme='editorial'] {
+  /* RGB channels */
+  --bp-rgb-canvas: 253 251 247;
+  --bp-rgb-paper: 244 241 234;
+  --bp-rgb-ink: 10 10 10;
+  --bp-rgb-ink-soft: 63 63 70;
+  --bp-rgb-ink-muted: 113 113 122;
+  --bp-rgb-ink-faint: 113 113 122;
+  --bp-rgb-accent: 217 119 87;
+  --bp-rgb-accent-deep: 168 93 65;
+  --bp-rgb-rose: 232 179 160;
+  --bp-rgb-whisper: 231 229 228;
+
+  /* Hex mirrors for JS / inline-style reads */
+  --bp-color-canvas: #fdfbf7;
+  --bp-color-paper: #f4f1ea;
+  --bp-color-ink: #0a0a0a;
+  --bp-color-ink-soft: #3f3f46;
+  --bp-color-ink-muted: #71717a;
+  --bp-color-ink-faint: #71717a;
+  --bp-color-body-text: #0a0a0a;
+  --bp-color-accent: #d97757;
+  --bp-color-accent-deep: #a85d41;
+  --bp-color-rose: #e8b3a0;
+  --bp-color-whisper: #e7e5e4;
+  --bp-color-focus-ring: rgba(217, 119, 87, 0.1);
+  --bp-color-focus-ring-firm: rgba(217, 119, 87, 0.2);
+}

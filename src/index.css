@@ -16,8 +16,9 @@ body,
 
 body {
   font-family: 'Inter Tight', system-ui, sans-serif;
-  background-color: #faf6f0;
-  color: #3a2e26;
+  /* Follows the active theme — defaults to Beauty Pro's canvas via :root */
+  background-color: rgb(var(--bp-rgb-canvas));
+  color: rgb(var(--bp-rgb-ink));
   -webkit-font-smoothing: antialiased;
 }
 
