@@ -1299,7 +1299,10 @@ export function ReadOnlyBlock({ block }) {
       );
     case 'tip':
       return (
-        <div className="rounded-lg border border-rose/30 bg-canvas/60 px-5 py-4">
+        <div
+          data-themed-card
+          className="border border-rose/30 bg-canvas/60 px-5 py-4"
+        >
           <div className="mb-1.5 flex items-center gap-1.5 text-[10px] uppercase tracking-[0.2em] text-rose">
             <span className="h-1 w-1 rounded-full bg-rose" />
             <span>Tip</span>
@@ -1312,7 +1315,10 @@ export function ReadOnlyBlock({ block }) {
       );
     case 'callout':
       return (
-        <div className="rounded-lg border border-accent/30 bg-paper/60 px-5 py-4">
+        <div
+          data-themed-card
+          className="border border-accent/30 bg-paper/60 px-5 py-4"
+        >
           <div className="mb-2 text-[10px] uppercase tracking-[0.22em] text-accent">
             Deeper understanding
           </div>
@@ -1330,7 +1336,8 @@ export function ReadOnlyBlock({ block }) {
           <img
             src={c.src}
             alt={c.caption || ''}
-            className={`rounded-lg ${imageWidthClass(c.width)}`}
+            data-themed-card
+            className={imageWidthClass(c.width)}
           />
           {c.caption && (
             <figcaption className="mt-2 text-[13px] italic text-ink-soft">

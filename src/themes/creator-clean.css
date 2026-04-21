@@ -12,3 +12,16 @@
   --bp-rgb-rose: 236 72 153;
   --bp-rgb-whisper: 229 231 235;
 }
+
+/* Sans display for a contemporary creator feel, slightly wider article
+ * column, crisp 4px corners, no shadows. */
+[data-theme='creator-clean'] [data-surface='themed'] {
+  --bp-font-display: 'Space Grotesk', system-ui, sans-serif;
+  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
+  --bp-tracking-display: -0.015em;
+  --bp-radius-card: 4px;
+  --bp-shadow-card: none;
+  --bp-content-pad-x: 4rem;
+  --bp-content-pad-y: 3rem;
+  --bp-article-max: 820px;
+}

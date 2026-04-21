@@ -12,3 +12,16 @@
   --bp-rgb-rose: 220 38 38;
   --bp-rgb-whisper: 203 213 225;
 }
+
+/* Traditional course look: serif display for trust, light shadow, a
+ * medium radius. Matches textbook / academic legibility norms. */
+[data-theme='education-classic'] [data-surface='themed'] {
+  --bp-font-display: 'Cormorant Garamond', Georgia, serif;
+  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
+  --bp-tracking-display: -0.005em;
+  --bp-radius-card: 6px;
+  --bp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --bp-content-pad-x: 4rem;
+  --bp-content-pad-y: 3.5rem;
+  --bp-article-max: 720px;
+}

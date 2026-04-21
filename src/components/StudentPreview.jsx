@@ -124,8 +124,16 @@ export default function StudentPreview({ courseTitle, moduleMeta, lessons, onExi
         <main className="flex flex-1 flex-col overflow-hidden">
           {current ? (
             <>
-              <div ref={contentRef} className="flex-1 overflow-y-auto px-16 py-14">
-                <article key={current.id} className="mx-auto max-w-[740px] animate-fade-up">
+              <div
+                ref={contentRef}
+                data-themed-content
+                className="flex-1 overflow-y-auto"
+              >
+                <article
+                  key={current.id}
+                  data-themed-article
+                  className="mx-auto animate-fade-up"
+                >
                   <LessonHero lesson={current} totalCount={lessons.length} />
                   <LessonBody lesson={current} />
                   <MarkCompleteButton

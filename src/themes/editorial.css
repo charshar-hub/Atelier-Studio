@@ -30,3 +30,16 @@
   --bp-color-focus-ring: rgba(217, 119, 87, 0.1);
   --bp-color-focus-ring-firm: rgba(217, 119, 87, 0.2);
 }
+
+/* Structural overrides when rendering inside a themed surface:
+ * magazine-style serif display, minimal card chrome. */
+[data-theme='editorial'] [data-surface='themed'] {
+  --bp-font-display: 'DM Serif Display', Georgia, serif;
+  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
+  --bp-tracking-display: -0.015em;
+  --bp-radius-card: 2px;
+  --bp-shadow-card: none;
+  --bp-content-pad-x: 4rem;
+  --bp-content-pad-y: 3.5rem;
+  --bp-article-max: 680px;
+}

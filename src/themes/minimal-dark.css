@@ -12,3 +12,15 @@
   --bp-rgb-rose: 249 115 22;
   --bp-rgb-whisper: 38 38 38;
 }
+
+/* Bold sans for everything, sharp edges, zero shadow, tighter padding. */
+[data-theme='minimal-dark'] [data-surface='themed'] {
+  --bp-font-display: 'Space Grotesk', system-ui, sans-serif;
+  --bp-font-body: 'Space Grotesk', system-ui, sans-serif;
+  --bp-tracking-display: -0.02em;
+  --bp-radius-card: 0px;
+  --bp-shadow-card: none;
+  --bp-content-pad-x: 3rem;
+  --bp-content-pad-y: 2.5rem;
+  --bp-article-max: 720px;
+}

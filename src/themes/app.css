@@ -28,8 +28,13 @@
 
 /* Themed surface: any subtree marked `data-surface="themed"` redirects
  * the app tokens to the active course theme's tokens, so everything
- * inside re-reads theme colors without changing class names. */
+ * inside re-reads theme colors without changing class names.
+ *
+ * Also declares structural tokens (font, radius, shadow, content
+ * padding) with Beauty-Pro defaults. Each theme overrides these at
+ * [data-theme="<id>"] [data-surface="themed"] scope. */
 [data-surface='themed'] {
+  /* Colors cascade from active theme */
   --app-rgb-canvas: var(--bp-rgb-canvas);
   --app-rgb-paper: var(--bp-rgb-paper);
   --app-rgb-ink: var(--bp-rgb-ink);
@@ -40,4 +45,43 @@
   --app-rgb-accent-deep: var(--bp-rgb-accent-deep);
   --app-rgb-rose: var(--bp-rgb-rose);
   --app-rgb-whisper: var(--bp-rgb-whisper);
+
+  /* Structural — Beauty Pro defaults. Each theme overrides these. */
+  --bp-font-display: 'Cormorant Garamond', Georgia, serif;
+  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
+  --bp-tracking-display: -0.01em;
+  --bp-radius-card: 12px;
+  --bp-shadow-card: 0 1px 3px rgba(58, 46, 38, 0.04);
+  --bp-content-pad-x: 4rem;
+  --bp-content-pad-y: 3.5rem;
+  --bp-article-max: 740px;
+
+  font-family: var(--bp-font-body);
+}
+
+/* Map existing Tailwind font utilities onto the themed fonts so every
+ * font-serif / font-sans class inside a themed surface follows the
+ * active theme without component-level changes. */
+[data-surface='themed'] .font-serif {
+  font-family: var(--bp-font-display);
+  letter-spacing: var(--bp-tracking-display);
+}
+[data-surface='themed'] .font-sans {
+  font-family: var(--bp-font-body);
+}
+
+/* Explicit structural hooks — opt-in via data attributes so we don't
+ * globally restyle every rounded-lg across the app. */
+[data-surface='themed'] [data-themed-card] {
+  border-radius: var(--bp-radius-card);
+  box-shadow: var(--bp-shadow-card);
+}
+[data-surface='themed'] [data-themed-content] {
+  padding-left: var(--bp-content-pad-x);
+  padding-right: var(--bp-content-pad-x);
+  padding-top: var(--bp-content-pad-y);
+  padding-bottom: var(--bp-content-pad-y);
+}
+[data-surface='themed'] [data-themed-article] {
+  max-width: var(--bp-article-max);
 }

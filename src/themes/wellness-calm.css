@@ -12,3 +12,16 @@
   --bp-rgb-rose: 200 165 160;
   --bp-rgb-whisper: 213 221 209;
 }
+
+/* Airy: soft serif display, generous vertical padding, pillow-rounded
+ * cards, very subtle shadow. */
+[data-theme='wellness-calm'] [data-surface='themed'] {
+  --bp-font-display: 'DM Serif Display', Georgia, serif;
+  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
+  --bp-tracking-display: -0.005em;
+  --bp-radius-card: 16px;
+  --bp-shadow-card: 0 1px 4px rgba(31, 43, 34, 0.04);
+  --bp-content-pad-x: 5rem;
+  --bp-content-pad-y: 5rem;
+  --bp-article-max: 700px;
+}
