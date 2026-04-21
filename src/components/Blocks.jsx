@@ -1,8 +1,14 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import RichText from './RichText';
 import ImageUploader from './ImageUploader';
 import { imageWidthClass } from '../lib/images';
-import { makeItemId } from '../lib/blockTypes';
+import {
+  makeItemId,
+  makeBlock,
+  cloneBlock,
+  SPLIT_CHILD_TYPES,
+  SPLIT_RATIOS,
+} from '../lib/blockTypes';
 
 // ---------------------------------------------------------------------------
 // Block picker — shown when the user clicks "+ Add block".
@@ -17,6 +23,7 @@ export const PICKER_ITEMS = [
   { type: 'steps', label: 'Steps', hint: 'Numbered sequence' },
   { type: 'checklist', label: 'Checklist', hint: 'Checkable items' },
   { type: 'video', label: 'Video', hint: 'YouTube / Vimeo URL' },
+  { type: 'split', label: 'Split layout', hint: '2 columns' },
   { type: 'divider', label: 'Divider', hint: '' },
 ];
 
@@ -477,6 +484,474 @@ export function ChecklistBlock({ block, onChange }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// SplitBlock — single parent block with two columns, each holding children.
+// Content shape: { ratio: '50-50' | ..., columns: [{ blocks: [] }, { blocks: [] }] }
+// Children are normal Block objects but restricted to SPLIT_CHILD_TYPES (no
+// nested splits). Supports per-column "+ Add" picker, variant presets,
+// ratio control, and a swap-columns button.
+// ---------------------------------------------------------------------------
+
+// Inline grid-template-columns per ratio. Tailwind JIT's arbitrary-value
+// scanner didn't reliably pick up `grid-cols-[minmax(0,1fr)_minmax(0,1fr)]`
+// from an object literal, so we drive the grid through a style prop instead.
+// Under the md breakpoint (~768px) we fall back to a single stacked column.
+const RATIO_TO_GRID = {
+  '50-50': 'minmax(0,1fr) minmax(0,1fr)',
+  '40-60': 'minmax(0,2fr) minmax(0,3fr)',
+  '60-40': 'minmax(0,3fr) minmax(0,2fr)',
+  '30-70': 'minmax(0,3fr) minmax(0,7fr)',
+  '70-30': 'minmax(0,7fr) minmax(0,3fr)',
+};
+
+function useIsDesktop() {
+  const get = () =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(min-width: 768px)').matches;
+  const [isDesktop, setIsDesktop] = useState(get);
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mql = window.matchMedia('(min-width: 768px)');
+    const onChange = (e) => setIsDesktop(e.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+  return isDesktop;
+}
+
+function useSplitGridStyle(ratio) {
+  const isDesktop = useIsDesktop();
+  const cols = RATIO_TO_GRID[ratio] || RATIO_TO_GRID['50-50'];
+  return {
+    gridTemplateColumns: isDesktop ? cols : 'minmax(0,1fr)',
+  };
+}
+
+const SPLIT_VARIANTS = [
+  {
+    key: 'image-text',
+    label: 'Image + Text',
+    hint: 'Image on the left, words on the right',
+    build: () => ({
+      ratio: '50-50',
+      columns: [
+        { blocks: [makeBlock('image')] },
+        { blocks: [makeBlock('heading'), makeBlock('text')] },
+      ],
+    }),
+  },
+  {
+    key: 'text-image',
+    label: 'Text + Image',
+    hint: 'Words on the left, image on the right',
+    build: () => ({
+      ratio: '50-50',
+      columns: [
+        { blocks: [makeBlock('heading'), makeBlock('text')] },
+        { blocks: [makeBlock('image')] },
+      ],
+    }),
+  },
+  {
+    key: 'image-image',
+    label: 'Image vs Image',
+    hint: 'Side-by-side comparison',
+    build: () => ({
+      ratio: '50-50',
+      columns: [
+        { blocks: [makeBlock('image'), makeBlock('text')] },
+        { blocks: [makeBlock('image'), makeBlock('text')] },
+      ],
+    }),
+  },
+];
+
+function SplitChildPicker({ onPick, onClose }) {
+  const items = PICKER_ITEMS.filter((i) => SPLIT_CHILD_TYPES.includes(i.type));
+  return (
+    <div
+      className="absolute left-1/2 top-full z-20 mt-1 w-[220px] -translate-x-1/2 rounded-lg border border-whisper bg-white p-1.5 shadow-[0_8px_28px_-12px_rgba(58,46,38,0.2)]"
+      onMouseLeave={onClose}
+    >
+      <div className="px-2 pb-1.5 pt-1 text-[9px] uppercase tracking-[0.22em] text-ink-muted">
+        Add to column
+      </div>
+      <ul className="space-y-0.5">
+        {items.map((item) => (
+          <li key={item.type}>
+            <button
+              type="button"
+              onClick={() => {
+                onPick(item.type);
+                onClose();
+              }}
+              className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-[13px] text-ink transition hover:bg-paper/70"
+            >
+              <span>{item.label}</span>
+              {item.hint && <span className="text-[11px] text-ink-muted">{item.hint}</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function SplitBlock({ block, onChange }) {
+  const content = block.content || { ratio: '50-50', columns: [{ blocks: [] }, { blocks: [] }] };
+  const { ratio, columns } = content;
+
+  // Empty split (new block) — show the three variant presets so users can
+  // bootstrap quickly. Once either column has a child, drop the picker.
+  const isEmpty =
+    (columns[0]?.blocks?.length ?? 0) === 0 && (columns[1]?.blocks?.length ?? 0) === 0;
+
+  const patchContent = (patch) =>
+    onChange({ content: { ...content, ...patch } });
+
+  const applyVariant = (variant) => patchContent(variant.build());
+
+  const setRatio = (r) => patchContent({ ratio: r });
+
+  const swapColumns = () =>
+    patchContent({ columns: [columns[1] || { blocks: [] }, columns[0] || { blocks: [] }] });
+
+  const updateColumn = (colIdx, nextBlocks) => {
+    const nextColumns = columns.map((col, i) =>
+      i === colIdx ? { ...col, blocks: nextBlocks } : col,
+    );
+    patchContent({ columns: nextColumns });
+  };
+
+  const insertChild = (colIdx, index, type) => {
+    if (!SPLIT_CHILD_TYPES.includes(type)) return;
+    const col = columns[colIdx] || { blocks: [] };
+    const next = [...(col.blocks || [])];
+    const clamped = Math.max(0, Math.min(index, next.length));
+    next.splice(clamped, 0, makeBlock(type));
+    updateColumn(colIdx, next);
+  };
+
+  const updateChild = (colIdx, childId, patch) => {
+    const col = columns[colIdx] || { blocks: [] };
+    updateColumn(
+      colIdx,
+      (col.blocks || []).map((b) => (b.id === childId ? { ...b, ...patch } : b)),
+    );
+  };
+
+  const deleteChild = (colIdx, childId) => {
+    const col = columns[colIdx] || { blocks: [] };
+    updateColumn(colIdx, (col.blocks || []).filter((b) => b.id !== childId));
+  };
+
+  const duplicateChild = (colIdx, childId) => {
+    const col = columns[colIdx] || { blocks: [] };
+    const idx = (col.blocks || []).findIndex((b) => b.id === childId);
+    if (idx === -1) return;
+    const copy = cloneBlock(col.blocks[idx]);
+    const next = [...col.blocks];
+    next.splice(idx + 1, 0, copy);
+    updateColumn(colIdx, next);
+  };
+
+  const moveChildToOtherColumn = (colIdx, childId) => {
+    const otherIdx = colIdx === 0 ? 1 : 0;
+    const col = columns[colIdx] || { blocks: [] };
+    const moving = (col.blocks || []).find((b) => b.id === childId);
+    if (!moving) return;
+    const nextColumns = columns.map((c, i) => {
+      if (i === colIdx) return { ...c, blocks: c.blocks.filter((b) => b.id !== childId) };
+      if (i === otherIdx) return { ...c, blocks: [...(c.blocks || []), moving] };
+      return c;
+    });
+    patchContent({ columns: nextColumns });
+  };
+
+  const reorderChild = (colIdx, fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    const col = columns[colIdx] || { blocks: [] };
+    const next = [...(col.blocks || [])];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(Math.max(0, Math.min(toIndex, next.length)), 0, moved);
+    updateColumn(colIdx, next);
+  };
+
+  const gridStyle = useSplitGridStyle(ratio);
+
+  return (
+    <div className="rounded-lg border border-whisper bg-paper/20 p-3">
+      {/* Toolbar */}
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
+        <span className="text-[10px] uppercase tracking-[0.22em]">Split layout</span>
+        <span className="mx-1 h-3 w-px bg-whisper" />
+        <label className="flex items-center gap-1">
+          <span>Ratio</span>
+          <select
+            value={ratio}
+            onChange={(e) => setRatio(e.target.value)}
+            className="rounded border border-whisper bg-white px-1.5 py-0.5 text-[11px] text-ink focus:outline-none"
+          >
+            {SPLIT_RATIOS.map((r) => (
+              <option key={r} value={r}>
+                {r.replace('-', ' / ')}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={swapColumns}
+          className="ml-auto rounded-md border border-whisper bg-white px-2 py-0.5 text-[11px] text-ink-soft hover:bg-paper hover:text-ink"
+        >
+          Swap columns ⇄
+        </button>
+      </div>
+
+      {/* Variant presets (only when empty) */}
+      {isEmpty && (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {SPLIT_VARIANTS.map((v) => (
+            <button
+              key={v.key}
+              type="button"
+              onClick={() => applyVariant(v)}
+              className="rounded-md border border-whisper bg-white px-2.5 py-1 text-[11px] text-ink-soft transition hover:border-accent/40 hover:bg-paper hover:text-ink"
+              title={v.hint}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Columns — grid on md+, stacks vertically on mobile (see useSplitGridStyle) */}
+      <div className="grid gap-3" style={gridStyle}>
+        {columns.map((col, colIdx) => (
+          <SplitColumn
+            key={colIdx}
+            colIdx={colIdx}
+            blocks={col.blocks || []}
+            onInsert={(idx, type) => insertChild(colIdx, idx, type)}
+            onUpdateChild={(childId, patch) => updateChild(colIdx, childId, patch)}
+            onDeleteChild={(childId) => deleteChild(colIdx, childId)}
+            onDuplicateChild={(childId) => duplicateChild(colIdx, childId)}
+            onMoveToOther={(childId) => moveChildToOtherColumn(colIdx, childId)}
+            onReorder={(from, to) => reorderChild(colIdx, from, to)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SplitColumn({
+  colIdx,
+  blocks,
+  onInsert,
+  onUpdateChild,
+  onDeleteChild,
+  onDuplicateChild,
+  onMoveToOther,
+  onReorder,
+}) {
+  const [pickerAt, setPickerAt] = useState(null);
+  const [drag, setDrag] = useState({ fromIndex: -1, overIndex: -1 });
+
+  const handleDragStart = (index) => (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    setDrag({ fromIndex: index, overIndex: -1 });
+  };
+  const handleDragOver = (index) => (e) => {
+    if (drag.fromIndex < 0) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (drag.overIndex !== index) setDrag((s) => ({ ...s, overIndex: index }));
+  };
+  const handleDrop = (index) => (e) => {
+    if (drag.fromIndex < 0) return;
+    e.preventDefault();
+    if (drag.fromIndex !== index) onReorder(drag.fromIndex, index);
+    setDrag({ fromIndex: -1, overIndex: -1 });
+  };
+  const handleDragEnd = () => setDrag({ fromIndex: -1, overIndex: -1 });
+
+  return (
+    <div className="rounded-md border border-dashed border-whisper bg-white p-2.5">
+      <div className="mb-1 text-[9px] uppercase tracking-[0.22em] text-ink-muted">
+        Column {colIdx + 1}
+      </div>
+
+      <div className="space-y-1">
+        <AddChildRow
+          open={pickerAt === 0}
+          onToggle={() => setPickerAt(pickerAt === 0 ? null : 0)}
+          onPick={(type) => {
+            onInsert(0, type);
+            setPickerAt(null);
+          }}
+        />
+
+        {blocks.map((child, index) => (
+          <div key={child.id}>
+            <SplitChildShell
+              onDelete={() => onDeleteChild(child.id)}
+              onDuplicate={() => onDuplicateChild(child.id)}
+              onMoveToOther={() => onMoveToOther(child.id)}
+              onDragStart={handleDragStart(index)}
+              onDragOver={handleDragOver(index)}
+              onDrop={handleDrop(index)}
+              onDragEnd={handleDragEnd}
+              isDragged={drag.fromIndex === index}
+              isDragTarget={
+                drag.overIndex === index &&
+                drag.fromIndex !== index &&
+                drag.fromIndex >= 0
+              }
+            >
+              <BlockBody
+                block={child}
+                onChange={(patch) => onUpdateChild(child.id, patch)}
+              />
+            </SplitChildShell>
+
+            <AddChildRow
+              open={pickerAt === index + 1}
+              onToggle={() => setPickerAt(pickerAt === index + 1 ? null : index + 1)}
+              onPick={(type) => {
+                onInsert(index + 1, type);
+                setPickerAt(null);
+              }}
+            />
+          </div>
+        ))}
+
+        {blocks.length === 0 && (
+          <div className="rounded-md border border-dashed border-whisper/60 px-3 py-4 text-center text-[11px] italic text-ink-muted">
+            Empty column — click + to add a block.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AddChildRow({ open, onToggle, onPick }) {
+  return (
+    <div className="relative flex items-center justify-center py-0.5">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex h-5 w-5 items-center justify-center rounded-full border border-whisper bg-white text-[13px] leading-none text-ink-muted opacity-0 transition hover:border-accent/60 hover:bg-paper hover:text-ink group-hover:opacity-100 focus:opacity-100"
+        style={{ opacity: open ? 1 : undefined }}
+        aria-label="Add block to column"
+      >
+        +
+      </button>
+      {open && <SplitChildPicker onPick={onPick} onClose={onToggle} />}
+    </div>
+  );
+}
+
+function SplitChildShell({
+  children,
+  onDelete,
+  onDuplicate,
+  onMoveToOther,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  isDragged,
+  isDragTarget,
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  return (
+    <div
+      className={`group relative flex items-start gap-1 rounded px-1 py-0.5 ${
+        isDragTarget ? 'border-t-2 border-accent/60' : ''
+      } ${isDragged ? 'opacity-40' : ''}`}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      <div className="flex w-5 flex-shrink-0 flex-col items-center pt-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <button
+          type="button"
+          draggable
+          onDragStart={onDragStart}
+          onDragEnd={onDragEnd}
+          className="flex h-4 w-4 cursor-grab items-center justify-center rounded text-ink-muted hover:bg-paper hover:text-ink active:cursor-grabbing"
+          aria-label="Drag to reorder"
+          title="Drag to reorder in column"
+        >
+          <svg width="8" height="12" viewBox="0 0 10 14" fill="currentColor">
+            <circle cx="2" cy="2" r="1.2" />
+            <circle cx="8" cy="2" r="1.2" />
+            <circle cx="2" cy="7" r="1.2" />
+            <circle cx="8" cy="7" r="1.2" />
+            <circle cx="2" cy="12" r="1.2" />
+            <circle cx="8" cy="12" r="1.2" />
+          </svg>
+        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((v) => !v)}
+            className="mt-0.5 flex h-4 w-4 items-center justify-center rounded text-ink-muted hover:bg-paper hover:text-ink"
+            aria-label="Block actions"
+          >
+            <span className="text-[13px] leading-none">⋯</span>
+          </button>
+          {menuOpen && (
+            <div
+              className="absolute left-5 top-0 z-30 w-[150px] rounded-md border border-whisper bg-white py-1 shadow-[0_6px_20px_-10px_rgba(58,46,38,0.25)]"
+              onMouseLeave={() => setMenuOpen(false)}
+            >
+              {onMoveToOther && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onMoveToOther();
+                    setMenuOpen(false);
+                  }}
+                  className="block w-full px-3 py-1.5 text-left text-[12px] text-ink hover:bg-paper"
+                >
+                  Move to other column
+                </button>
+              )}
+              {onDuplicate && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDuplicate();
+                    setMenuOpen(false);
+                  }}
+                  className="block w-full px-3 py-1.5 text-left text-[12px] text-ink hover:bg-paper"
+                >
+                  Duplicate
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onDelete();
+                    setMenuOpen(false);
+                  }}
+                  className="block w-full px-3 py-1.5 text-left text-[12px] text-rose hover:bg-rose/10"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  );
+}
+
 // Dispatcher — used by the Canvas and student preview.
 export function BlockBody({ block, onChange, readOnly = false }) {
   if (!block) return null;
@@ -499,6 +974,8 @@ export function BlockBody({ block, onChange, readOnly = false }) {
       return <StepsBlock block={block} onChange={onChange} />;
     case 'checklist':
       return <ChecklistBlock block={block} onChange={onChange} />;
+    case 'split':
+      return <SplitBlock block={block} onChange={onChange} />;
     case 'divider':
       return <DividerBlock />;
     default:
@@ -659,7 +1136,27 @@ export function ReadOnlyBlock({ block }) {
     }
     case 'divider':
       return <hr className="my-2 border-0 border-t border-whisper" />;
+    case 'split':
+      // Separate component so useSplitGridStyle's hook usage stays valid.
+      return <ReadOnlySplit block={block} />;
     default:
       return null;
   }
+}
+
+function ReadOnlySplit({ block }) {
+  const c = block.content || {};
+  const cols = Array.isArray(c.columns) ? c.columns : [];
+  const gridStyle = useSplitGridStyle(c.ratio);
+  return (
+    <div className="grid gap-5" style={gridStyle}>
+      {cols.map((col, i) => (
+        <div key={i} className="space-y-3">
+          {(col.blocks || []).map((nb) => (
+            <ReadOnlyBlock key={nb.id} block={nb} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
 }

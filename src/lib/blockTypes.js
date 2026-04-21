@@ -29,7 +29,23 @@ export const BLOCK_TYPES = [
   'checklist',
   'steps',
   'divider',
+  'split',
 ];
+
+// Block types that are allowed as children inside a split-layout column.
+// Excludes `split` itself (no nested splits) and `divider` (not useful here).
+export const SPLIT_CHILD_TYPES = [
+  'text',
+  'heading',
+  'tip',
+  'callout',
+  'image',
+  'video',
+  'checklist',
+  'steps',
+];
+
+export const SPLIT_RATIOS = ['50-50', '40-60', '60-40', '30-70', '70-30'];
 
 export const IMAGE_WIDTHS = ['small', 'medium', 'large', 'full'];
 
@@ -58,6 +74,11 @@ function emptyContentFor(type) {
       return [];
     case 'divider':
       return null;
+    case 'split':
+      return {
+        ratio: '50-50',
+        columns: [{ blocks: [] }, { blocks: [] }],
+      };
     default:
       return '';
   }
@@ -128,6 +149,24 @@ export function normalizeBlock(raw) {
     }
     case 'divider':
       return { ...base, content: null };
+    case 'split': {
+      const c = raw.content || {};
+      const ratio = SPLIT_RATIOS.includes(c.ratio) ? c.ratio : '50-50';
+      const rawCols = Array.isArray(c.columns) ? c.columns : [];
+      // Always exactly two columns. Extras dropped, missing filled with empty.
+      const columns = [0, 1].map((i) => {
+        const col = rawCols[i] || {};
+        const blocks = Array.isArray(col.blocks) ? col.blocks : [];
+        return {
+          // Split columns can't themselves contain splits — normalize flat and
+          // filter out nested splits defensively.
+          blocks: blocks
+            .map(normalizeBlock)
+            .filter((b) => b.type !== 'split'),
+        };
+      });
+      return { ...base, content: { ratio, columns } };
+    }
     default:
       return {
         ...base,
@@ -157,6 +196,10 @@ export function blockHasContent(block) {
       return Array.isArray(block.content) && block.content.some((it) => htmlToPlain(it.text).trim());
     case 'divider':
       return true;
+    case 'split': {
+      const cols = block.content?.columns || [];
+      return cols.some((col) => (col.blocks || []).some(blockHasContent));
+    }
     default:
       return Boolean(htmlToPlain(block.content || '').trim());
   }
@@ -184,6 +227,19 @@ export function blockToPlainText(block) {
         .join('\n');
     case 'divider':
       return '---';
+    case 'split': {
+      const cols = block.content?.columns || [];
+      return cols
+        .map((col, i) => {
+          const inner = (col.blocks || [])
+            .map(blockToPlainText)
+            .filter(Boolean)
+            .join('\n');
+          return inner ? `[Column ${i + 1}]\n${inner}` : '';
+        })
+        .filter(Boolean)
+        .join('\n\n');
+    }
     default:
       return htmlToPlain(block.content || '');
   }
@@ -205,6 +261,19 @@ export function cloneBlock(block) {
       return { ...block, id, content: { ...block.content } };
     case 'divider':
       return { ...block, id, content: null };
+    case 'split': {
+      const c = block.content || {};
+      return {
+        ...block,
+        id,
+        content: {
+          ratio: c.ratio || '50-50',
+          columns: (c.columns || []).map((col) => ({
+            blocks: (col.blocks || []).map(cloneBlock),
+          })),
+        },
+      };
+    }
     default:
       return { ...block, id };
   }
