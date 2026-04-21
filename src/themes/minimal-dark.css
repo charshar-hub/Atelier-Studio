@@ -1,0 +1,14 @@
+/* Minimal Dark — dark background, high contrast, stark accent. */
+
+[data-theme='minimal-dark'] {
+  --bp-rgb-canvas: 10 10 10;
+  --bp-rgb-paper: 23 23 23;
+  --bp-rgb-ink: 250 250 250;
+  --bp-rgb-ink-soft: 212 212 216;
+  --bp-rgb-ink-muted: 161 161 170;
+  --bp-rgb-ink-faint: 113 113 122;
+  --bp-rgb-accent: 250 250 250;
+  --bp-rgb-accent-deep: 228 228 231;
+  --bp-rgb-rose: 249 115 22;
+  --bp-rgb-whisper: 38 38 38;
+}

@@ -13,6 +13,10 @@ import './index.css';
 import './themes/app.css';
 import './themes/beauty-pro.css';
 import './themes/editorial.css';
+import './themes/minimal-dark.css';
+import './themes/creator-clean.css';
+import './themes/education-classic.css';
+import './themes/wellness-calm.css';
 import { applyTheme } from './themes';
 
 // Beauty Pro is the frozen snapshot of the current aesthetic. Setting it

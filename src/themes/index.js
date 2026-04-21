@@ -6,14 +6,29 @@
 
 import { beautyPro } from './beauty-pro';
 import { editorial } from './editorial';
+import { minimalDark } from './minimal-dark';
+import { creatorClean } from './creator-clean';
+import { educationClassic } from './education-classic';
+import { wellnessCalm } from './wellness-calm';
 
 export const THEMES = Object.freeze({
   'beauty-pro': beautyPro,
   editorial,
+  'minimal-dark': minimalDark,
+  'creator-clean': creatorClean,
+  'education-classic': educationClassic,
+  'wellness-calm': wellnessCalm,
 });
 
 // Ordered for UI pickers.
-export const THEME_LIST = Object.freeze([beautyPro, editorial]);
+export const THEME_LIST = Object.freeze([
+  beautyPro,
+  editorial,
+  minimalDark,
+  creatorClean,
+  educationClassic,
+  wellnessCalm,
+]);
 
 export const DEFAULT_THEME_ID = 'beauty-pro';
 

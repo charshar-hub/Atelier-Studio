@@ -1,0 +1,14 @@
+/* Creator Clean — white canvas, visual-first, subtle grayscale borders. */
+
+[data-theme='creator-clean'] {
+  --bp-rgb-canvas: 255 255 255;
+  --bp-rgb-paper: 249 250 251;
+  --bp-rgb-ink: 17 24 39;
+  --bp-rgb-ink-soft: 55 65 81;
+  --bp-rgb-ink-muted: 107 114 128;
+  --bp-rgb-ink-faint: 156 163 175;
+  --bp-rgb-accent: 17 24 39;
+  --bp-rgb-accent-deep: 0 0 0;
+  --bp-rgb-rose: 236 72 153;
+  --bp-rgb-whisper: 229 231 235;
+}

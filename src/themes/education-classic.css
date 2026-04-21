@@ -1,0 +1,14 @@
+/* Education Classic — soft slate canvas, trusted blue accent. */
+
+[data-theme='education-classic'] {
+  --bp-rgb-canvas: 248 250 252;
+  --bp-rgb-paper: 226 232 240;
+  --bp-rgb-ink: 15 23 42;
+  --bp-rgb-ink-soft: 51 65 85;
+  --bp-rgb-ink-muted: 100 116 139;
+  --bp-rgb-ink-faint: 148 163 184;
+  --bp-rgb-accent: 37 99 235;
+  --bp-rgb-accent-deep: 29 78 216;
+  --bp-rgb-rose: 220 38 38;
+  --bp-rgb-whisper: 203 213 225;
+}

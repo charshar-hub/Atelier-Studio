@@ -1,0 +1,14 @@
+/* Wellness Calm — sage green on warm off-white, airy and gentle. */
+
+[data-theme='wellness-calm'] {
+  --bp-rgb-canvas: 247 249 245;
+  --bp-rgb-paper: 232 239 228;
+  --bp-rgb-ink: 31 43 34;
+  --bp-rgb-ink-soft: 74 90 78;
+  --bp-rgb-ink-muted: 122 139 126;
+  --bp-rgb-ink-faint: 163 180 167;
+  --bp-rgb-accent: 107 142 111;
+  --bp-rgb-accent-deep: 79 109 83;
+  --bp-rgb-rose: 200 165 160;
+  --bp-rgb-whisper: 213 221 209;
+}
