@@ -23,10 +23,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Rich text placeholder — shown when the contentEditable is empty. */
+/* Rich text placeholder — shown when the contentEditable is empty.
+ * Colour follows the active theme (neutral app chrome or themed
+ * surface) via --app-rgb-ink-faint. No hardcoded hex values. */
 .rich-text:empty::before {
   content: attr(data-placeholder);
-  color: #8a7666;
+  color: rgb(var(--app-rgb-ink-faint));
   font-style: italic;
   pointer-events: none;
 }

@@ -46,10 +46,16 @@ export default function Topbar({
       {/* Course name — editable */}
       <div className="flex flex-1 items-center justify-center">
         <div className="flex items-center rounded-full bg-whisper/40 px-4 py-1.5 transition-colors hover:bg-whisper/60 focus-within:bg-whisper/70">
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" className="mr-1.5">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            className="mr-1.5 text-ink-muted"
+          >
             <path
               d="M11 2L14 5L5 14H2V11L11 2Z"
-              stroke="#6B5848"
+              stroke="currentColor"
               strokeWidth="1.2"
               strokeLinecap="round"
               strokeLinejoin="round"

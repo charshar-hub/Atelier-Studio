@@ -131,12 +131,12 @@ export default function CourseOverview({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex h-[160px] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#D4C5B0] bg-paper/30 text-center transition hover:bg-paper/60"
+                  className="flex h-[160px] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-whisper bg-paper/30 text-center text-ink-soft transition hover:bg-paper/60"
                 >
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path
                       d="M12 4v12m0 0l-4-4m4 4l4-4M5 20h14"
-                      stroke="#7A5D3E"
+                      stroke="currentColor"
                       strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
