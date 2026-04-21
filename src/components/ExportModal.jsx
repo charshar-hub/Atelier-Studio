@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { blockToPlainText } from '../lib/blocks';
+import { blockToPlainText } from '../lib/blockTypes';
 
 export default function ExportModal({ courseMeta, lessons, onClose }) {
   const text = useMemo(() => buildCourseText(courseMeta, lessons), [courseMeta, lessons]);
@@ -144,11 +144,18 @@ function buildCourseText(meta, lessons) {
       lines.push('');
       lines.push(lesson.summary);
     }
-    for (const sb of lesson.subBlocks) {
-      const text = blockToPlainText(sb);
+    // Flat block export: headings print in uppercase as section markers,
+    // every other populated block prints its plain-text content underneath.
+    const blocks = Array.isArray(lesson.blocks) ? lesson.blocks : [];
+    for (const b of blocks) {
+      const text = blockToPlainText(b);
+      if (b.type === 'heading' && text && text.trim()) {
+        lines.push('');
+        lines.push(text.toUpperCase());
+        continue;
+      }
       if (!text || !text.trim()) continue;
       lines.push('');
-      lines.push(sb.label.toUpperCase());
       lines.push(text);
     }
     lines.push('');

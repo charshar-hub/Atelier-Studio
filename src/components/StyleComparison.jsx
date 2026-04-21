@@ -1,4 +1,4 @@
-import { blockToPlainText } from '../lib/blocks';
+import { blockToPlainText } from '../lib/blockTypes';
 
 export default function StyleComparison({ before, after, styleLabel, onApply, onCancel }) {
   const rows = buildRows(before, after);
@@ -120,13 +120,18 @@ function buildRows(before, after) {
     { key: 'duration', label: 'Duration', before: before.duration, after: after.duration },
     { key: 'summary', label: 'Summary', before: before.summary, after: after.summary },
   ];
-  const subBlockRows = before.subBlocks.map((sb, i) => ({
-    key: `sb-${i}`,
-    label: sb.label,
-    before: blockToPlainText(sb),
-    after: after.subBlocks[i] ? blockToPlainText(after.subBlocks[i]) : '',
+  const beforeBlocks = Array.isArray(before.blocks) ? before.blocks : [];
+  const afterBlocks = Array.isArray(after.blocks) ? after.blocks : [];
+  // Diff block content by index. Block order is preserved across an AI merge,
+  // so index is a good key. Labels surface the block's role (or type) so the
+  // reader can see which section changed.
+  const blockRows = beforeBlocks.map((b, i) => ({
+    key: `b-${i}`,
+    label: b.role || b.type,
+    before: blockToPlainText(b),
+    after: afterBlocks[i] ? blockToPlainText(afterBlocks[i]) : '',
   }));
-  return [...base, ...subBlockRows].filter((r) => (r.before || '') !== (r.after || ''));
+  return [...base, ...blockRows].filter((r) => (r.before || '') !== (r.after || ''));
 }
 
 // Word-level LCS diff — marks tokens in `after` that are new relative to `before`.

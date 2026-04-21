@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ImageUploader from './ImageUploader';
-import { blockHasContent } from '../lib/blocks';
+import { blockHasContent } from '../lib/blockTypes';
 
 export default function Teach({
   lessons,
@@ -731,7 +731,7 @@ function LivePreview({ card }) {
 function EmptyStage({ lesson, onGenerate, onStartBlank, isGenerating }) {
   const hasLessonContent = Boolean(
     (lesson.summary && lesson.summary.trim()) ||
-      (lesson.subBlocks || []).some((sb) => blockHasContent(sb)),
+      (lesson.blocks || []).some((b) => blockHasContent(b)),
   );
 
   return (

@@ -28,6 +28,20 @@ import OnboardingIntro from './components/OnboardingIntro';
 import { isSupabaseConfigured } from './lib/supabase';
 import * as coursesApi from './lib/courses';
 import * as styleKitApi from './lib/styleKit';
+import {
+  makeBlock,
+  makeBlockId,
+  normalizeBlock,
+  cloneBlock,
+  blockToPlainText,
+} from './lib/blockTypes';
+import {
+  migrateLessonToBlocks,
+  buildBlocksFromLessonPayload,
+  buildBlocksFromStructureResponse,
+  buildBlocksFromExpandResponse,
+  buildExpandSectionsFromBlocks,
+} from './lib/migrateLesson';
 
 // Temporary: surface env + Supabase wiring so prod misconfig is visible.
 if (typeof window !== 'undefined') {
@@ -44,38 +58,9 @@ if (typeof window !== 'undefined') {
   }
 }
 
-const BLOCK_TYPES = {
-  text: { label: 'Text', defaultLabel: 'Notes', tint: '#B8936A' },
-  bullet_list: { label: 'Bullet list', defaultLabel: 'Key points', tint: '#C9A876' },
-  deep_dive: { label: 'Deep dive', defaultLabel: 'Deeper understanding', tint: '#D4A89A' },
-  steps: { label: 'Demo steps', defaultLabel: 'Demo steps', tint: '#D4A89A' },
-  tips: { label: 'Tips', defaultLabel: 'Tips', tint: '#C9A876' },
-  custom: { label: 'Custom section', defaultLabel: 'Section', tint: '#A89178' },
-  visual: { label: 'Visual example', defaultLabel: 'Visual example', tint: '#C9A876' },
-  comparison: {
-    label: 'Comparison',
-    defaultLabel: 'Correct vs. incorrect',
-    tint: '#D4A89A',
-  },
-};
-
-// The four canonical blocks that exist on a fresh lesson and map to AI payload
-// keys. `role` is what keeps AI response merging working when users rename
-// ("Script" → "My opening") — labels are cosmetic, roles are semantic.
-const CANONICAL_BLOCKS = [
-  { type: 'text', role: 'script', label: 'Script', tint: '#B8936A' },
-  { type: 'steps', role: 'demoSteps', label: 'Demo steps', tint: '#D4A89A' },
-  { type: 'tips', role: 'mistakes', label: 'Common mistakes', tint: '#C9A876' },
-  { type: 'tips', role: 'tip', label: 'Pro tip', tint: '#A89178' },
-];
-
-const LEGACY_LABEL_TO_CANONICAL = {
-  Script: CANONICAL_BLOCKS[0],
-  'Demo steps': CANONICAL_BLOCKS[1],
-  'Common mistakes': CANONICAL_BLOCKS[2],
-  'Pro tip': CANONICAL_BLOCKS[3],
-};
-
+// Role → AI payload key. Blocks that AI generated carry a `role` so that
+// Match-Style / Improve / Rewrite / Refine can merge updates back into the
+// right block even after the user renames headings.
 const ROLE_TO_API_KEY = {
   script: 'script',
   demoSteps: 'demoSteps',
@@ -83,7 +68,7 @@ const ROLE_TO_API_KEY = {
   tip: 'proTip',
 };
 
-const ROLE_TO_LEGACY_LABEL = {
+const ROLE_TO_LABEL = {
   script: 'Script',
   demoSteps: 'Demo steps',
   mistakes: 'Common mistakes',
@@ -98,349 +83,43 @@ function makeModuleId() {
   return `m-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-// Monotonic counter guarantees no ID collisions even inside a tight .map
-// loop where Date.now() returns the same millisecond for every call.
-let _idCounter = 0;
-function nextIdSuffix() {
-  _idCounter = (_idCounter + 1) % 1_000_000;
-  return `${Date.now()}-${_idCounter.toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-}
-
-function makeBlockId() {
-  return `b-${nextIdSuffix()}`;
-}
-
-function makeItemId() {
-  return `i-${nextIdSuffix()}`;
-}
-
-const IMAGE_WIDTHS = ['small', 'medium', 'large', 'full'];
-
-function normalizeImage(img) {
-  if (!img || typeof img !== 'object' || typeof img.src !== 'string') return null;
-  return {
-    src: img.src,
-    width: IMAGE_WIDTHS.includes(img.width) ? img.width : 'full',
-  };
-}
-
-function normalizeStepItem(raw) {
-  return {
-    id: raw?.id || makeItemId(),
-    text: typeof raw?.text === 'string' ? raw.text : '',
-    image: normalizeImage(raw?.image),
-  };
-}
-
-function splitLegacyStepsContent(content) {
-  if (typeof content !== 'string' || !content.trim()) return [];
-  const lines = content
-    .split(/\n+|\s*·\s*/)
-    .map((s) => s.replace(/^\s*\d+\s*[.)]\s*/, '').trim())
-    .filter(Boolean);
-  if (lines.length === 0) return [{ id: makeItemId(), text: content.trim(), image: null }];
-  return lines.map((text) => ({ id: makeItemId(), text, image: null }));
-}
-
-function blockTypeDefaults(type) {
-  switch (type) {
-    case 'steps':
-    case 'bullet_list':
-      return { items: [] };
-    case 'visual':
-      return { image: null, caption: '', notes: [], layout: 'standard' };
-    case 'comparison':
-      return {
-        left: { image: null, label: 'Correct' },
-        right: { image: null, label: 'Incorrect' },
-        size: 'full',
-      };
-    default:
-      return { content: '' };
-  }
-}
-
-// Nested block types that can live inside a bullet_list item.
-const NESTED_BLOCK_TYPES = new Set([
-  'text',
-  'image',
-  'tip',
-  'note',
-  'comparison',
-  'divider',
-]);
-
-function normalizeNestedBlock(raw) {
-  const type = NESTED_BLOCK_TYPES.has(raw?.type) ? raw.type : 'text';
-  const base = { id: raw?.id || makeBlockId(), type };
-  if (type === 'image') {
-    return { ...base, image: normalizeImage(raw?.image) };
-  }
-  if (type === 'comparison') {
-    return {
-      ...base,
-      left: normalizeImage(raw?.left),
-      right: normalizeImage(raw?.right),
-      leftLabel:
-        typeof raw?.leftLabel === 'string' && raw.leftLabel.trim()
-          ? raw.leftLabel
-          : 'Correct',
-      rightLabel:
-        typeof raw?.rightLabel === 'string' && raw.rightLabel.trim()
-          ? raw.rightLabel
-          : 'Incorrect',
-    };
-  }
-  if (type === 'divider') return base;
-  return { ...base, content: typeof raw?.content === 'string' ? raw.content : '' };
-}
-
-function nestedBlockDefaults(type) {
-  switch (type) {
-    case 'image':
-      return { image: null };
-    case 'comparison':
-      return {
-        left: null,
-        right: null,
-        leftLabel: 'Correct',
-        rightLabel: 'Incorrect',
-      };
-    case 'divider':
-      return {};
-    default:
-      return { content: '' };
-  }
-}
-
-function makeNestedBlock(type) {
-  return {
-    id: makeBlockId(),
-    type,
-    ...nestedBlockDefaults(type),
-  };
-}
-
-function normalizeBulletItem(raw) {
-  return {
-    id: raw?.id || makeItemId(),
-    text: typeof raw?.text === 'string' ? raw.text : '',
-    blocks: Array.isArray(raw?.blocks) ? raw.blocks.map(normalizeNestedBlock) : [],
-  };
-}
-
-function makeCanonicalBlock(def) {
-  return {
-    id: makeBlockId(),
-    type: def.type,
-    role: def.role,
-    label: def.label,
-    tint: def.tint,
-    ...blockTypeDefaults(def.type),
-  };
-}
-
-// Converts one section from /api/structureLesson's sections[] shape into a
-// lesson sub-block. bullet_points → a bullet_list block whose items always
-// carry at least two nested blocks (enforced by hydrateBulletItemBlocks).
-// expand → a deep_dive callout.
-//
-// Items can arrive as plain strings (legacy/simple) or objects shaped like
-// { title, blocks: [{type, content}] } — both are accepted, both get
-// normalised to { id, text, blocks: [...] } with populated blocks so the
-// editor never ends up with "title-only" bullets even when the AI output
-// is truncated or partial.
-function hydrateBulletItemBlocks(rawBlocks, bulletText) {
-  const normalised = Array.isArray(rawBlocks)
-    ? rawBlocks.map(normalizeNestedBlock)
-    : [];
-  // Drop any nested text/tip/note blocks whose content came back empty —
-  // those are effectively noise from a truncated generation.
-  const pruned = normalised.filter((b) => {
-    if (b.type === 'image' || b.type === 'comparison' || b.type === 'divider') {
-      return true;
-    }
-    return typeof b.content === 'string' && b.content.trim();
-  });
-
-  if (pruned.length === 0) {
-    // Zero usable blocks — synthesise one from the bullet title and leave an
-    // empty tip placeholder so the educator has a prompt to fill in.
-    return [
-      { id: makeBlockId(), type: 'text', content: bulletText || '' },
-      { id: makeBlockId(), type: 'tip', content: '' },
-    ];
-  }
-  if (pruned.length === 1) {
-    // One block only — add an empty tip placeholder so every bullet has the
-    // text + teaching-layer shape the editor expects.
-    const type = pruned[0].type === 'tip' ? 'note' : 'tip';
-    pruned.push({ id: makeBlockId(), type, content: '' });
-  }
-  return pruned;
-}
-
-function outlineSectionToBlock(section) {
-  const title = typeof section?.title === 'string' ? section.title.trim() : '';
-  if (section?.type === 'expand') {
-    return {
-      id: makeBlockId(),
-      type: 'deep_dive',
-      label: title || 'Deeper understanding',
-      tint: BLOCK_TYPES.deep_dive.tint,
-      content: typeof section?.notes === 'string' ? section.notes : '',
-    };
-  }
-  const rawItems = Array.isArray(section?.items) ? section.items : [];
-  const items = rawItems
-    .map((raw) => {
-      if (typeof raw === 'string') {
-        const text = raw.trim();
-        if (!text) return null;
-        return {
-          id: makeItemId(),
-          text,
-          blocks: hydrateBulletItemBlocks([], text),
-        };
-      }
-      if (raw && typeof raw === 'object') {
-        const text =
-          typeof raw.title === 'string'
-            ? raw.title.trim()
-            : typeof raw.text === 'string'
-              ? raw.text.trim()
-              : '';
-        if (!text && !Array.isArray(raw.blocks)) return null;
-        return {
-          id: makeItemId(),
-          text,
-          blocks: hydrateBulletItemBlocks(raw.blocks, text),
-        };
-      }
-      return null;
-    })
-    .filter(Boolean);
-  return {
-    id: makeBlockId(),
-    type: 'bullet_list',
-    label: title || 'Section',
-    tint: BLOCK_TYPES.bullet_list.tint,
-    items,
-  };
-}
-
-function normalizeBlock(raw) {
-  const fallbackTint = (type) => BLOCK_TYPES[type]?.tint || '#A89178';
-
-  // Already normalized (has id + type) — round-trip type-specific fields.
-  if (raw && raw.id && raw.type) {
-    const base = {
-      id: raw.id,
-      type: raw.type,
-      role: raw.role,
-      label: raw.label || BLOCK_TYPES[raw.type]?.defaultLabel || 'Section',
-      tint: raw.tint || fallbackTint(raw.type),
-    };
-    if (raw.type === 'steps') {
-      const items = Array.isArray(raw.items) ? raw.items.map(normalizeStepItem) : [];
-      if (items.length === 0 && typeof raw.content === 'string' && raw.content.trim()) {
-        return { ...base, items: splitLegacyStepsContent(raw.content) };
-      }
-      return { ...base, items };
-    }
-    if (raw.type === 'bullet_list') {
-      const items = Array.isArray(raw.items) ? raw.items.map(normalizeBulletItem) : [];
-      return { ...base, items };
-    }
-    if (raw.type === 'visual') {
-      return {
-        ...base,
-        image: normalizeImage(raw.image),
-        caption: typeof raw.caption === 'string' ? raw.caption : '',
-        notes: Array.isArray(raw.notes)
-          ? raw.notes.filter((n) => typeof n === 'string')
-          : [],
-        layout: raw.layout === 'split' ? 'split' : 'standard',
-      };
-    }
-    if (raw.type === 'comparison') {
-      const side = (s, fallback) => ({
-        image: normalizeImage(s?.image),
-        label: typeof s?.label === 'string' && s.label.trim() ? s.label : fallback,
-      });
-      return {
-        ...base,
-        left: side(raw.left, 'Correct'),
-        right: side(raw.right, 'Incorrect'),
-        size: IMAGE_WIDTHS.includes(raw.size) ? raw.size : 'full',
-      };
-    }
-    return { ...base, content: raw.content || '' };
-  }
-  // Legacy block: identify canonical by label.
-  const legacyLabel = raw?.label || '';
-  const canonical = LEGACY_LABEL_TO_CANONICAL[legacyLabel];
-  if (canonical) {
-    const base = {
-      id: makeBlockId(),
-      type: canonical.type,
-      role: canonical.role,
-      label: legacyLabel,
-      tint: raw?.tint || canonical.tint,
-    };
-    if (canonical.type === 'steps') {
-      return { ...base, items: splitLegacyStepsContent(raw?.content || '') };
-    }
-    return { ...base, content: raw?.content || '' };
-  }
-  return {
-    id: makeBlockId(),
-    type: 'text',
-    label: legacyLabel || 'Section',
-    tint: raw?.tint || BLOCK_TYPES.text.tint,
-    content: raw?.content || '',
-  };
-}
-
 function normalizeCard(raw) {
   const r = raw || {};
   // Legacy slide shape: {title, points}
-  if (Array.isArray(r.points) && !Array.isArray(r.keyPoints)) {
-    return {
-      title: r.title || '',
-      keyPoints: r.points.filter((p) => typeof p === 'string'),
-      sayLikeThis: '',
-      watchFor: '',
-      image: normalizeImage(r.image),
-    };
-  }
+  const keyPoints = Array.isArray(r.keyPoints)
+    ? r.keyPoints.filter((p) => typeof p === 'string')
+    : Array.isArray(r.points)
+      ? r.points.filter((p) => typeof p === 'string')
+      : [];
+  const image =
+    r.image && typeof r.image === 'object' && typeof r.image.src === 'string'
+      ? { src: r.image.src, width: r.image.width || 'full' }
+      : null;
   return {
     title: r.title || '',
-    keyPoints: Array.isArray(r.keyPoints)
-      ? r.keyPoints.filter((p) => typeof p === 'string')
-      : [],
+    keyPoints,
     sayLikeThis: typeof r.sayLikeThis === 'string' ? r.sayLikeThis : '',
     watchFor: typeof r.watchFor === 'string' ? r.watchFor : '',
-    image: normalizeImage(r.image),
+    image,
   };
 }
 
+// Normalize (and migrate from legacy subBlocks shape if needed) a lesson.
 function normalizeLesson(lesson) {
-  const raw = Array.isArray(lesson.subBlocks) ? lesson.subBlocks : [];
-  const subBlocks = raw.map(normalizeBlock);
-  const rawCards = Array.isArray(lesson.cards)
-    ? lesson.cards
-    : Array.isArray(lesson.slides)
-      ? lesson.slides
+  const base = migrateLessonToBlocks(lesson);
+  const rawCards = Array.isArray(base.cards)
+    ? base.cards
+    : Array.isArray(base.slides)
+      ? base.slides
       : [];
   return {
-    id: lesson.id || makeId(),
-    number: lesson.number,
-    moduleId: lesson.moduleId || '',
-    title: lesson.title || '',
-    duration: lesson.duration || '',
-    summary: lesson.summary || '',
-    subBlocks,
+    id: base.id || makeId(),
+    number: base.number,
+    moduleId: base.moduleId || '',
+    title: base.title || '',
+    duration: base.duration || '',
+    summary: base.summary || '',
+    blocks: Array.isArray(base.blocks) ? base.blocks.map(normalizeBlock) : [],
     cards: rawCards.map(normalizeCard),
   };
 }
@@ -464,7 +143,6 @@ function migrateCourseContent(raw) {
     return { modules, lessons, overview };
   }
 
-  // Legacy shape: derive a single module from meta
   const meta = c.meta || DEFAULT_META;
   const moduleId = makeModuleId();
   return {
@@ -516,112 +194,8 @@ function buildEmptyLesson(number, moduleId = '') {
     title: '',
     duration: '',
     summary: '',
-    // No canonical pre-filled blocks. A fresh lesson is a blank canvas —
-    // users compose it via "+ Add section". AI-generated lessons still
-    // arrive pre-populated with role-tagged blocks (see handleGenerateLesson
-    // and onboarding) so Match Style / Refine can still target them.
-    subBlocks: [],
+    blocks: [],
     cards: [],
-  };
-}
-
-const STYLE_VARIANTS = [
-  {
-    key: 'warm',
-    label: 'Warm & mentor-like',
-    transforms: {
-      title: (t) => (t.includes('— a gentle walkthrough') ? t : `${t} — a gentle walkthrough`),
-      summary: (t) => `Take a breath. ${t} You're building something beautiful.`,
-      Script: (t) => `Gently: ${t}`,
-      'Demo steps': (t) => `${t} · move with care`,
-      'Common mistakes': (t) => `${t} — we've all been there.`,
-      'Pro tip': (t) => `From the heart: ${t}`,
-    },
-  },
-  {
-    key: 'professional',
-    label: 'Crisp & professional',
-    transforms: {
-      title: (t) => (t.includes(': Technique') ? t : `${t}: Technique & Application`),
-      summary: (t) => `Objective: ${t} Outcome-driven delivery.`,
-      Script: (t) => `State clearly: ${t}`,
-      'Demo steps': (t) => `Procedure — ${t}`,
-      'Common mistakes': (t) => `Critical: ${t}. Mitigate with deliberate practice.`,
-      'Pro tip': (t) => `Industry note: ${t}.`,
-    },
-  },
-  {
-    key: 'detailed',
-    label: 'Rich & detailed',
-    transforms: {
-      title: (t) => (t.includes('(step-by-step)') ? t : `${t} (step-by-step)`),
-      summary: (t) =>
-        `${t} In this expanded walkthrough we'll also cover timing, tools, and adaptation for different lash types.`,
-      Script: (t) => `${t} Pause — confirm comfort before continuing.`,
-      'Demo steps': (t) => `${t} · each step: breathe, observe, adjust`,
-      'Common mistakes': (t) =>
-        `${t}. Also watch for: rushed technique, poor lighting, inconsistent pressure.`,
-      'Pro tip': (t) => `${t}. Practice on a mannequin head twice before your next client.`,
-    },
-  },
-];
-
-function weaveVocab(text, word, template) {
-  if (!text || !word) return text;
-  if (text.toLowerCase().includes(word)) return text;
-  return template(text.replace(/[.!?]\s*$/, ''), word);
-}
-
-function stepify(text) {
-  if (!text) return text;
-  if (/^\s*\d+\s*[.)]/.test(text)) return text;
-  const header = text.match(/^(\d+\s+steps?\s*[·:\-–—]\s*)(.+)$/i);
-  const body = header ? header[2] : text;
-  const prefix = header ? header[1] : '';
-  const parts = body.split(/[·;,]\s*/).map((s) => s.trim()).filter(Boolean);
-  if (parts.length < 2) return text;
-  return prefix + parts.map((p, i) => `${i + 1}. ${p}`).join('  ·  ');
-}
-
-function applyStyleToLesson(lesson, variant, profile) {
-  const t = variant.transforms;
-  const tx = (fn, value) => (value && value.trim() ? fn(value) : value);
-  const vocab = profile?.vocabulary || [];
-  const [vocab1, vocab2] = vocab;
-  const signature = profile?.signature;
-  const structure = profile?.structure;
-
-  return {
-    ...lesson,
-    title: tx(t.title, lesson.title),
-    summary: weaveVocab(
-      tx(t.summary, lesson.summary),
-      vocab1,
-      (s, w) => `${s} — with an emphasis on ${w}.`,
-    ),
-    subBlocks: lesson.subBlocks.map((sb) => {
-      // The local mock variants only understand plain text blocks. Steps/visual/
-      // comparison blocks are left untouched — users still get the full AI
-      // transform when the network path succeeds.
-      if (sb.type !== 'text' && sb.type !== 'tips' && sb.type !== 'custom') return sb;
-      const lookupLabel = sb.role ? ROLE_TO_LEGACY_LABEL[sb.role] : sb.label;
-      const fn = t[lookupLabel];
-      if (!fn) return sb;
-      let content = tx(fn, sb.content);
-      if (sb.role === 'script' && content && signature && !content.includes(signature)) {
-        content = `${content} ${signature}`;
-      }
-      if (sb.role === 'demoSteps' && content && structure === 'Step-by-step teaching') {
-        content = stepify(content);
-      }
-      if (sb.role === 'tip' && content) {
-        content = weaveVocab(content, vocab2, (s, w) => `${s} — keep your ${w} sharp.`);
-      }
-      if (sb.role === 'mistakes' && content) {
-        content = weaveVocab(content, vocab1, (s, w) => `${s}. Watch the ${w} carefully.`);
-      }
-      return { ...sb, content };
-    }),
   };
 }
 
@@ -711,15 +285,6 @@ function migrateStyleProfile(profile) {
   };
 }
 
-const STRUCTURE_OPTIONS = [
-  'Step-by-step teaching',
-  'Conversational Q&A',
-  'Narrative storytelling',
-  'Direct & concise',
-];
-
-const TONE_OPTIONS = Object.entries(TONE_LABELS).map(([key, label]) => ({ key, label }));
-
 export default function App() {
   // Routing
   const [view, setView] = useState('home');
@@ -749,7 +314,6 @@ export default function App() {
 
   // Builder UI state
   const [selectedLessonId, setSelectedLessonId] = useState(null);
-  const [styleIndex, setStyleIndex] = useState(0);
   const [styleProfile, setStyleProfile] = useState(null);
   const [styleSampleText, setStyleSampleText] = useState('');
   const [styleKitLoaded, setStyleKitLoaded] = useState(false);
@@ -764,7 +328,6 @@ export default function App() {
   const [isOutlineModalOpen, setIsOutlineModalOpen] = useState(false);
   const [isExpanding, setIsExpanding] = useState(false);
   const [pendingExpansion, setPendingExpansion] = useState(null);
-  const [expandedBulletIds, setExpandedBulletIds] = useState(() => new Set());
   const [isAnalyzingStyle, setIsAnalyzingStyle] = useState(false);
   const [pendingStyleMatch, setPendingStyleMatch] = useState(null);
   const [styleMatchDialogOpen, setStyleMatchDialogOpen] = useState(false);
@@ -982,12 +545,7 @@ export default function App() {
           title: lessonPayload.title || '',
           duration: lessonPayload.duration || '',
           summary: lessonPayload.summary || '',
-          subBlocks: [
-            { label: 'Script', content: lessonPayload.script || '' },
-            { label: 'Demo steps', content: lessonPayload.demoSteps || '' },
-            { label: 'Common mistakes', content: lessonPayload.commonMistakes || '' },
-            { label: 'Pro tip', content: lessonPayload.proTip || '' },
-          ],
+          blocks: buildBlocksFromLessonPayload(lessonPayload),
         })
       : buildEmptyLesson(1, firstModuleId);
 
@@ -1131,12 +689,7 @@ export default function App() {
         title: data.title || '',
         duration: data.duration || '',
         summary: data.summary || '',
-        subBlocks: [
-          { label: 'Script', content: data.script || '' },
-          { label: 'Demo steps', content: data.demoSteps || '' },
-          { label: 'Common mistakes', content: data.commonMistakes || '' },
-          { label: 'Pro tip', content: data.proTip || '' },
-        ],
+        blocks: buildBlocksFromLessonPayload(data),
       });
       return [...prev, lesson];
     });
@@ -1218,97 +771,33 @@ export default function App() {
     }, 60);
   };
 
+  // Insert a single structured-outline section into the current lesson.
   const handleInsertOutlineSection = (section) => {
     const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
     if (!targetLessonId) return;
-    const [block] = normalizeInsertedBlocks([outlineSectionToBlock(section)]);
+    const newBlocks = buildBlocksFromStructureResponse({ sections: [section] });
+    if (newBlocks.length === 0) return;
     setLessons((prev) =>
       prev.map((l) =>
-        l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, block] } : l,
+        l.id === targetLessonId ? { ...l, blocks: [...l.blocks, ...newBlocks] } : l,
       ),
     );
-    scrollToBlock(block.id);
+    scrollToBlock(newBlocks[0].id);
     recordChange('Inserted outline section', section?.title || '');
-  };
-
-  // Unconditional post-processing that runs on the full array of blocks about
-  // to be inserted into a lesson. Re-asserts the "every bullet has >= 1
-  // block" invariant so that even if the AI output / outlineSectionToBlock
-  // path ever slipped through a partial case, the state hitting setLessons
-  // is guaranteed consistent. Logs any self-repair so it's visible in dev.
-  const normalizeInsertedBlocks = (blocks) => {
-    let repaired = 0;
-    const out = blocks.map((b) => {
-      if (b?.type !== 'bullet_list') return b;
-      const items = Array.isArray(b.items) ? b.items : [];
-      const fixedItems = items.map((it) => {
-        const text =
-          typeof it?.text === 'string' && it.text.trim()
-            ? it.text
-            : typeof it?.title === 'string'
-              ? it.title
-              : '';
-        const existing = Array.isArray(it?.blocks) ? it.blocks : [];
-        if (existing.length > 0) {
-          return { id: it?.id || makeItemId(), text, blocks: existing };
-        }
-        repaired += 1;
-        return {
-          id: it?.id || makeItemId(),
-          text,
-          blocks: [
-            { id: makeBlockId(), type: 'text', content: text || '' },
-            { id: makeBlockId(), type: 'tip', content: '' },
-          ],
-        };
-      });
-      return { ...b, items: fixedItems };
-    });
-    if (repaired > 0) {
-      console.warn(
-        `[structureLesson] normalizeInsertedBlocks repaired ${repaired} bullet(s) with empty blocks`,
-      );
-    }
-    // Dev-only visibility into what landed in the lesson. Remove later.
-    console.log('[structureLesson] inserting blocks:', out);
-    return out;
-  };
-
-  // Collect every bullet item id from a freshly-inserted set of blocks so we
-  // can auto-expand them all in the UI. Previously we only expanded the first
-  // two of the first block, which made later sections look empty even though
-  // they had layered content — users weren't clicking the chevron to check.
-  const collectFirstBulletItemIds = (blocks) => {
-    const ids = [];
-    for (const b of blocks) {
-      if (b.type !== 'bullet_list' || !Array.isArray(b.items)) continue;
-      for (const it of b.items) {
-        if (it?.id) ids.push(it.id);
-      }
-    }
-    return ids;
   };
 
   const handleInsertEntireOutline = () => {
     const targetLessonId = structuredOutline?.lessonId || selectedLessonId;
     const sections = structuredOutline?.outline?.sections;
     if (!targetLessonId || !Array.isArray(sections) || sections.length === 0) return;
-    console.log('[structureLesson] raw AI sections:', sections);
-    const blocks = normalizeInsertedBlocks(sections.map(outlineSectionToBlock));
+    const newBlocks = buildBlocksFromStructureResponse({ sections });
+    if (newBlocks.length === 0) return;
     setLessons((prev) =>
       prev.map((l) =>
-        l.id === targetLessonId ? { ...l, subBlocks: [...l.subBlocks, ...blocks] } : l,
+        l.id === targetLessonId ? { ...l, blocks: [...l.blocks, ...newBlocks] } : l,
       ),
     );
-    const autoExpand = collectFirstBulletItemIds(blocks);
-    if (autoExpand.length > 0) {
-      setExpandedBulletIds((prev) => {
-        const next = new Set(prev);
-        autoExpand.forEach((id) => next.add(id));
-        return next;
-      });
-    }
-    scrollToBlock(blocks[0]?.id);
+    scrollToBlock(newBlocks[0]?.id);
     recordChange('Inserted full outline', structuredOutline.lessonTitle || '');
     setIsOutlineModalOpen(false);
   };
@@ -1318,23 +807,14 @@ export default function App() {
     const sections = structuredOutline?.outline?.sections;
     if (!targetLessonId || !Array.isArray(sections) || sections.length === 0) return;
     const confirmed = window.confirm(
-      'Replace this lesson\'s content with the structured outline? Existing sections will be removed.',
+      "Replace this lesson's content with the structured outline? Existing blocks will be removed.",
     );
     if (!confirmed) return;
-    console.log('[structureLesson] raw AI sections:', sections);
-    const blocks = normalizeInsertedBlocks(sections.map(outlineSectionToBlock));
+    const newBlocks = buildBlocksFromStructureResponse({ sections });
     setLessons((prev) =>
-      prev.map((l) => (l.id === targetLessonId ? { ...l, subBlocks: blocks } : l)),
+      prev.map((l) => (l.id === targetLessonId ? { ...l, blocks: newBlocks } : l)),
     );
-    const autoExpand = collectFirstBulletItemIds(blocks);
-    if (autoExpand.length > 0) {
-      setExpandedBulletIds((prev) => {
-        const next = new Set(prev);
-        autoExpand.forEach((id) => next.add(id));
-        return next;
-      });
-    }
-    scrollToBlock(blocks[0]?.id);
+    scrollToBlock(newBlocks[0]?.id);
     recordChange('Replaced lesson with outline', structuredOutline.lessonTitle || '');
     setIsOutlineModalOpen(false);
   };
@@ -1376,37 +856,17 @@ export default function App() {
     }
   };
 
-  const handleToggleBullet = (bulletId) => {
-    if (!bulletId) return;
-    setExpandedBulletIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(bulletId)) next.delete(bulletId);
-      else next.add(bulletId);
-      return next;
-    });
-  };
-
+  // Expand: collect bullet-like content (heading → text/steps/checklist) from
+  // the flat block list into section+items payload the backend expects.
   const handleExpandLesson = async () => {
     if (isExpanding) return;
     const lesson = lessons.find((l) => l.id === selectedLessonId);
     if (!lesson) return;
 
-    // Bullet-style blocks (bullet_list and legacy steps) are what we send to
-    // the API. Plain text / deep-dive / visual blocks are skipped — they're
-    // already prose or imagery.
-    const sections = lesson.subBlocks
-      .filter((sb) => sb.type === 'bullet_list' || sb.type === 'steps')
-      .map((sb) => ({
-        title: sb.label || 'Section',
-        items: (sb.items || [])
-          .map((it) => (typeof it?.text === 'string' ? it.text.trim() : ''))
-          .filter(Boolean),
-      }))
-      .filter((s) => s.items.length > 0);
-
+    const sections = buildExpandSectionsFromBlocks(lesson.blocks);
     if (sections.length === 0) {
       alert(
-        'This lesson has no bullet sections to expand. Use "Structure lesson" first, or add a Bullet list block.',
+        'This lesson has no heading + bullet-like content to expand. Add a heading with a steps or checklist block below it, then try again.',
       );
       return;
     }
@@ -1439,61 +899,15 @@ export default function App() {
   const handleApplyExpansion = () => {
     if (!pendingExpansion) return;
     const { expansion, lessonId } = pendingExpansion;
-    const expSections = Array.isArray(expansion?.sections) ? expansion.sections : [];
-    if (expSections.length === 0) {
+    const newBlocks = buildBlocksFromExpandResponse(expansion);
+    if (newBlocks.length === 0) {
       setPendingExpansion(null);
       return;
     }
-
-    // For each expanded section, build a text block and slot it in right
-    // after the matching steps block (matched by label, case-insensitive).
-    const newBlocks = expSections.map((s) => {
-      const items = Array.isArray(s?.items) ? s.items : [];
-      const content = items
-        .filter((i) => i && (i.bullet || i.expanded))
-        .map((i) => `${(i.bullet || '').trim()}\n${(i.expanded || '').trim()}`.trim())
-        .join('\n\n');
-      return {
-        block: {
-          id: makeBlockId(),
-          type: 'text',
-          label: `${(s.title || 'Section').trim()} — expanded`,
-          tint: BLOCK_TYPES.text.tint,
-          content,
-        },
-        sectionTitle: (s.title || '').trim().toLowerCase(),
-      };
-    });
-
-    let firstInsertedId = null;
     setLessons((prev) =>
-      prev.map((l) => {
-        if (l.id !== lessonId) return l;
-        const next = [];
-        l.subBlocks.forEach((sb) => {
-          next.push(sb);
-          if (sb.type !== 'steps' && sb.type !== 'bullet_list') return;
-          const match = newBlocks.find(
-            (nb) => nb.sectionTitle && nb.sectionTitle === (sb.label || '').trim().toLowerCase(),
-          );
-          if (match) {
-            next.push(match.block);
-            if (!firstInsertedId) firstInsertedId = match.block.id;
-          }
-        });
-        // Any expanded sections that didn't match a steps-block label get
-        // appended at the end so nothing is silently dropped.
-        const placedIds = new Set(next.map((b) => b.id));
-        newBlocks.forEach((nb) => {
-          if (!placedIds.has(nb.block.id)) {
-            next.push(nb.block);
-            if (!firstInsertedId) firstInsertedId = nb.block.id;
-          }
-        });
-        return { ...l, subBlocks: next };
-      }),
+      prev.map((l) => (l.id === lessonId ? { ...l, blocks: [...l.blocks, ...newBlocks] } : l)),
     );
-    scrollToBlock(firstInsertedId);
+    scrollToBlock(newBlocks[0]?.id);
     recordChange('Expanded lesson to teach', pendingExpansion.lessonTitle || '');
     setPendingExpansion(null);
   };
@@ -1503,12 +917,7 @@ export default function App() {
   const canExpandSelected = (() => {
     const l = lessons.find((x) => x.id === selectedLessonId);
     if (!l) return false;
-    return l.subBlocks.some(
-      (sb) =>
-        (sb.type === 'bullet_list' || sb.type === 'steps') &&
-        Array.isArray(sb.items) &&
-        sb.items.some((i) => i?.text?.trim()),
-    );
+    return buildExpandSectionsFromBlocks(l.blocks).length > 0;
   })();
 
   const handleGenerateCards = async (lessonId) => {
@@ -1516,11 +925,7 @@ export default function App() {
     const lesson = lessons.find((l) => l.id === lessonId);
     if (!lesson) return;
 
-    const byRole = Object.fromEntries(
-      lesson.subBlocks
-        .filter((sb) => sb.role)
-        .map((sb) => [sb.role, serializeBlockForAI(sb)]),
-    );
+    const byRole = rolePayloadFromBlocks(lesson.blocks);
     setGeneratingCardsForId(lessonId);
 
     try {
@@ -1711,117 +1116,47 @@ export default function App() {
     recordChange('Removed a lesson', removed?.title || '');
   };
 
-  const handleUpdateSubBlock = (lessonId, blockId, value) => {
-    setLessons((prev) =>
-      prev.map((l) =>
-        l.id === lessonId
-          ? {
-              ...l,
-              subBlocks: l.subBlocks.map((sb) =>
-                sb.id === blockId ? { ...sb, content: value } : sb,
-              ),
-            }
-          : l,
-      ),
-    );
-  };
-
-  const handleRenameBlock = (lessonId, blockId, label) => {
-    setLessons((prev) =>
-      prev.map((l) =>
-        l.id === lessonId
-          ? {
-              ...l,
-              subBlocks: l.subBlocks.map((sb) =>
-                sb.id === blockId ? { ...sb, label } : sb,
-              ),
-            }
-          : l,
-      ),
-    );
-  };
-
   const handleDuplicateBlock = (lessonId, blockId) => {
     setLessons((prev) =>
       prev.map((l) => {
         if (l.id !== lessonId) return l;
-        const idx = l.subBlocks.findIndex((sb) => sb.id === blockId);
+        const idx = l.blocks.findIndex((b) => b.id === blockId);
         if (idx === -1) return l;
-        const original = l.subBlocks[idx];
-        const copy = {
-          id: makeBlockId(),
-          type: original.type,
-          label: `${original.label} copy`,
-          content: original.content,
-          tint: original.tint,
-          // Duplicates drop the canonical role so AI match-style doesn't
-          // overwrite both blocks with the same content.
-        };
-        const next = [...l.subBlocks];
+        // Drop role on duplicates so AI merges don't overwrite both with the
+        // same content.
+        const { role: _drop, ...rest } = l.blocks[idx];
+        const copy = cloneBlock(rest);
+        const next = [...l.blocks];
         next.splice(idx + 1, 0, copy);
-        return { ...l, subBlocks: next };
+        return { ...l, blocks: next };
       }),
     );
-    recordChange('Duplicated a section');
-  };
-
-  // Convert a legacy `steps` block (numbered items with image uploaders) into a
-  // `bullet_list` block (clean text-only items). Used to clean up lessons that
-  // were populated by Structure Lesson before bullet_list existed.
-  const handleConvertToBulletList = (lessonId, blockId) => {
-    setLessons((prev) =>
-      prev.map((l) => {
-        if (l.id !== lessonId) return l;
-        return {
-          ...l,
-          subBlocks: l.subBlocks.map((sb) => {
-            if (sb.id !== blockId || sb.type !== 'steps') return sb;
-            const items = Array.isArray(sb.items) ? sb.items : [];
-            return {
-              id: sb.id,
-              type: 'bullet_list',
-              label: sb.label,
-              tint: BLOCK_TYPES.bullet_list.tint,
-              items: items.map((it) => ({
-                id: it.id || makeItemId(),
-                text: typeof it.text === 'string' ? it.text : '',
-              })),
-            };
-          }),
-        };
-      }),
-    );
-    recordChange('Converted demo steps to bullet list');
+    recordChange('Duplicated a block');
   };
 
   const handleDeleteBlock = (lessonId, blockId) => {
-    const lesson = lessons.find((l) => l.id === lessonId);
-    const removed = lesson?.subBlocks.find((sb) => sb.id === blockId);
     setLessons((prev) =>
       prev.map((l) =>
-        l.id === lessonId
-          ? { ...l, subBlocks: l.subBlocks.filter((sb) => sb.id !== blockId) }
-          : l,
+        l.id === lessonId ? { ...l, blocks: l.blocks.filter((b) => b.id !== blockId) } : l,
       ),
     );
-    recordChange('Removed a section', removed?.label || '');
+    recordChange('Removed a block');
   };
 
-  const handleAddBlock = (lessonId, type) => {
-    const def = BLOCK_TYPES[type] || BLOCK_TYPES.text;
-    const block = {
-      id: makeBlockId(),
-      type,
-      label: def.defaultLabel,
-      tint: def.tint,
-      ...blockTypeDefaults(type),
-    };
+  // Insert a fresh block of `type` at a specific index in the lesson's block
+  // list. Replaces the old `handleAddBlock` which only appended.
+  const handleInsertBlock = (lessonId, index, type) => {
+    const block = makeBlock(type);
     setLessons((prev) =>
-      prev.map((l) =>
-        l.id === lessonId ? { ...l, subBlocks: [...l.subBlocks, block] } : l,
-      ),
+      prev.map((l) => {
+        if (l.id !== lessonId) return l;
+        const next = [...l.blocks];
+        const clamped = Math.max(0, Math.min(index, next.length));
+        next.splice(clamped, 0, block);
+        return { ...l, blocks: next };
+      }),
     );
-    recordChange(`Added ${def.label.toLowerCase()} section`);
+    recordChange(`Added ${type} block`);
   };
 
   const handleReorderBlock = (lessonId, fromIndex, toIndex) => {
@@ -1829,12 +1164,12 @@ export default function App() {
     setLessons((prev) =>
       prev.map((l) => {
         if (l.id !== lessonId) return l;
-        const next = [...l.subBlocks];
+        const next = [...l.blocks];
         if (fromIndex < 0 || fromIndex >= next.length) return l;
         const [moved] = next.splice(fromIndex, 1);
         const clampedTo = Math.max(0, Math.min(toIndex, next.length));
         next.splice(clampedTo, 0, moved);
-        return { ...l, subBlocks: next };
+        return { ...l, blocks: next };
       }),
     );
   };
@@ -1845,54 +1180,30 @@ export default function App() {
         l.id === lessonId
           ? {
               ...l,
-              subBlocks: l.subBlocks.map((sb) =>
-                sb.id === blockId ? { ...sb, ...patch } : sb,
-              ),
+              blocks: l.blocks.map((b) => (b.id === blockId ? { ...b, ...patch } : b)),
             }
           : l,
       ),
     );
   };
 
-  const serializeBlockForAI = (sb) => {
-    // Rich-text blocks may store HTML (bold/lists/spans) — AI endpoints want
-    // clean plain text. Use the DOM parser via a temporary element.
-    const stripHtml = (html) => {
-      if (typeof html !== 'string' || !html) return '';
-      const el = document.createElement('div');
-      el.innerHTML = html;
-      return el.textContent || '';
-    };
-    if (sb.type === 'steps') {
-      return (sb.items || [])
-        .map((it, i) => {
-          const text = stripHtml(it.text).trim();
-          return text ? `${i + 1}. ${text}` : '';
-        })
-        .filter(Boolean)
-        .join('\n');
+  // Extract role-tagged plain text from the flat blocks list so AI endpoints
+  // (generateCards, matchStyle, aiAction) keep receiving the same shape.
+  function rolePayloadFromBlocks(blocks) {
+    const out = { script: '', demoSteps: '', mistakes: '', tip: '' };
+    if (!Array.isArray(blocks)) return out;
+    for (const b of blocks) {
+      if (!b || !b.role) continue;
+      const text = blockToPlainText(b).trim();
+      if (!text) continue;
+      // Concatenate if multiple blocks share a role (e.g. heading + body).
+      out[b.role] = out[b.role] ? `${out[b.role]}\n${text}` : text;
     }
-    return stripHtml(sb.content);
-  };
-
-  const parseAIStringIntoBlock = (sb, value) => {
-    if (sb.type !== 'steps') return { ...sb, content: value };
-    const lines = value
-      .split(/\n+/)
-      .map((s) => s.replace(/^\s*\d+\s*[.)]\s*/, '').trim())
-      .filter(Boolean);
-    if (lines.length === 0) {
-      return { ...sb, items: value.trim() ? [{ id: makeItemId(), text: value.trim(), image: null }] : [] };
-    }
-    return { ...sb, items: lines.map((text) => ({ id: makeItemId(), text, image: null })) };
-  };
+    return out;
+  }
 
   const buildMatchStylePayload = (lesson) => {
-    const byRole = Object.fromEntries(
-      lesson.subBlocks
-        .filter((sb) => sb.role)
-        .map((sb) => [sb.role, serializeBlockForAI(sb)]),
-    );
+    const byRole = rolePayloadFromBlocks(lesson.blocks);
     return {
       title: lesson.title,
       duration: lesson.duration,
@@ -1904,38 +1215,80 @@ export default function App() {
     };
   };
 
-  const mergeAIResponseIntoLesson = (lesson, data) => ({
-    ...lesson,
-    title: typeof data.title === 'string' ? data.title : lesson.title,
-    duration: typeof data.duration === 'string' ? data.duration : lesson.duration,
-    summary: typeof data.summary === 'string' ? data.summary : lesson.summary,
-    subBlocks: lesson.subBlocks.map((sb) => {
-      const apiKey = sb.role ? ROLE_TO_API_KEY[sb.role] : null;
-      if (!apiKey || typeof data[apiKey] !== 'string') return sb;
-      return parseAIStringIntoBlock(sb, data[apiKey]);
-    }),
-  });
+  // Merge an AI response ({title, summary, script, demoSteps, commonMistakes,
+  // proTip}) back into the lesson's flat blocks. Targets blocks by role. If
+  // no block carries the role, a new block is appended (heading + content).
+  const mergeAIResponseIntoLesson = (lesson, data) => {
+    const next = [...lesson.blocks];
+    const seen = new Set();
 
-  const stageMockMatchStyle = () => {
-    const current = lessons.find((l) => l.id === selectedLessonId);
-    if (!current) return;
-    let variant;
-    let advance = false;
-    if (styleProfile) {
-      variant =
-        STYLE_VARIANTS.find((v) => v.key === inferToneKey(styleProfile)) ?? STYLE_VARIANTS[0];
-    } else {
-      variant = STYLE_VARIANTS[styleIndex % STYLE_VARIANTS.length];
-      advance = true;
+    const roleOrder = ['script', 'demoSteps', 'mistakes', 'tip'];
+    for (const role of roleOrder) {
+      const apiKey = ROLE_TO_API_KEY[role];
+      const value = typeof data[apiKey] === 'string' ? data[apiKey] : null;
+      if (value === null) continue;
+
+      // Update any existing block(s) with this role. For steps-like roles,
+      // demoSteps text is converted into a steps block's items if that's the
+      // host block type. Otherwise the plain string is stored as HTML text.
+      let hit = false;
+      for (let i = 0; i < next.length; i += 1) {
+        const b = next[i];
+        if (!b || b.role !== role) continue;
+        hit = true;
+        seen.add(role);
+        if (b.type === 'heading') continue; // heading text stays stable
+        if (b.type === 'steps') {
+          const items = value
+            .split(/\n+/)
+            .map((s) => s.replace(/^\s*\d+\s*[.)]\s*/, '').trim())
+            .filter(Boolean);
+          next[i] = {
+            ...b,
+            content: items.length
+              ? items.map((t) => ({ id: makeBlockId(), text: t }))
+              : [],
+          };
+        } else {
+          next[i] = { ...b, content: value };
+        }
+      }
+      if (!hit && value.trim()) {
+        // No existing role-tagged block — append heading + content at end.
+        next.push({
+          id: makeBlockId(),
+          type: 'heading',
+          role,
+          content: ROLE_TO_LABEL[role] || role,
+        });
+        if (role === 'demoSteps') {
+          const items = value
+            .split(/\n+/)
+            .map((s) => s.replace(/^\s*\d+\s*[.)]\s*/, '').trim())
+            .filter(Boolean);
+          next.push({
+            id: makeBlockId(),
+            type: 'steps',
+            role,
+            content: items.length
+              ? items.map((t) => ({ id: makeBlockId(), text: t }))
+              : [],
+          });
+        } else if (role === 'tip' || role === 'mistakes') {
+          next.push({ id: makeBlockId(), type: 'tip', role, content: value });
+        } else {
+          next.push({ id: makeBlockId(), type: 'text', role, content: value });
+        }
+      }
     }
-    const after = applyStyleToLesson(current, variant, styleProfile);
-    setPendingStyleMatch({
-      lessonId: current.id,
-      before: current,
-      after,
-      styleLabel: variant.label,
-      advanceStyleIndex: advance,
-    });
+
+    return {
+      ...lesson,
+      title: typeof data.title === 'string' ? data.title : lesson.title,
+      duration: typeof data.duration === 'string' ? data.duration : lesson.duration,
+      summary: typeof data.summary === 'string' ? data.summary : lesson.summary,
+      blocks: next,
+    };
   };
 
   const handleMatchStyle = () => {
@@ -1954,9 +1307,8 @@ export default function App() {
     const effectiveProfile =
       useSavedProfile && styleProfile ? { ...styleProfile, strength } : null;
 
-    // If the user gave nothing to work with, fall straight to the mock cycle.
     if (!keywords && !effectiveProfile) {
-      stageMockMatchStyle();
+      alert('Add some style keywords or capture your voice first, then try again.');
       return;
     }
 
@@ -1994,8 +1346,8 @@ export default function App() {
         advanceStyleIndex: false,
       });
     } catch (err) {
-      console.error('Match style failed, falling back to mock:', err);
-      stageMockMatchStyle();
+      console.error('Match style failed:', err);
+      alert(`Match style failed: ${err.message}`);
     } finally {
       setIsMatchingStyle(false);
     }
@@ -2007,9 +1359,6 @@ export default function App() {
     setLessons((prev) =>
       prev.map((l) => (l.id === pendingStyleMatch.lessonId ? pendingStyleMatch.after : l)),
     );
-    if (pendingStyleMatch.advanceStyleIndex) {
-      setStyleIndex((i) => (i + 1) % STYLE_VARIANTS.length);
-    }
     setPendingStyleMatch(null);
     recordChange('Applied Match my style', appliedTitle);
   };
@@ -2038,28 +1387,11 @@ export default function App() {
       }
       const data = await resp.json();
 
-      if (mode === 'demoSteps') {
-        setLessons((prev) =>
-          prev.map((l) =>
-            l.id === selectedLessonId
-              ? {
-                  ...l,
-                  subBlocks: l.subBlocks.map((sb) =>
-                    sb.role === 'demoSteps' && typeof data.demoSteps === 'string'
-                      ? parseAIStringIntoBlock(sb, data.demoSteps)
-                      : sb,
-                  ),
-                }
-              : l,
-          ),
-        );
-      } else {
-        setLessons((prev) =>
-          prev.map((l) =>
-            l.id === selectedLessonId ? mergeAIResponseIntoLesson(l, data) : l,
-          ),
-        );
-      }
+      setLessons((prev) =>
+        prev.map((l) =>
+          l.id === selectedLessonId ? mergeAIResponseIntoLesson(l, data) : l,
+        ),
+      );
       const actionLabel = {
         demoSteps: 'Regenerated demo steps',
         improve: 'Improved content',
@@ -2083,18 +1415,19 @@ export default function App() {
     if (refiningSections.has(key)) return;
     const lesson = lessons.find((l) => l.id === lessonId);
     if (!lesson) return;
-    const subBlock = lesson.subBlocks.find((sb) => sb.id === blockId);
-    if (!subBlock) return;
+    const block = lesson.blocks.find((b) => b.id === blockId);
+    if (!block) return;
 
     setRefiningSections((prev) => new Set(prev).add(key));
 
-    const priorText = serializeBlockForAI(subBlock);
+    const priorText = blockToPlainText(block);
+    const sectionLabel = block.role ? ROLE_TO_LABEL[block.role] : block.type;
     try {
       const resp = await fetch('/api/refineSection', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          sectionLabel: subBlock.label,
+          sectionLabel,
           currentContent: priorText,
           lessonTitle: lesson.title,
           lessonSummary: lesson.summary,
@@ -2109,24 +1442,36 @@ export default function App() {
       const hadPrior = Boolean(priorText && priorText.trim());
       if (typeof data.content === 'string' && data.content.trim()) {
         setLessons((prev) =>
-          prev.map((l) =>
-            l.id === lessonId
-              ? {
-                  ...l,
-                  subBlocks: l.subBlocks.map((sb) =>
-                    sb.id === blockId ? parseAIStringIntoBlock(sb, data.content) : sb,
-                  ),
+          prev.map((l) => {
+            if (l.id !== lessonId) return l;
+            return {
+              ...l,
+              blocks: l.blocks.map((b) => {
+                if (b.id !== blockId) return b;
+                if (b.type === 'steps') {
+                  const items = data.content
+                    .split(/\n+/)
+                    .map((s) => s.replace(/^\s*\d+\s*[.)]\s*/, '').trim())
+                    .filter(Boolean);
+                  return {
+                    ...b,
+                    content: items.length
+                      ? items.map((t) => ({ id: makeBlockId(), text: t }))
+                      : [],
+                  };
                 }
-              : l,
-          ),
+                return { ...b, content: data.content };
+              }),
+            };
+          }),
         );
         recordChange(
-          `${hadPrior ? 'Improved' : 'Generated'} ${subBlock.label.toLowerCase()}`,
+          `${hadPrior ? 'Improved' : 'Generated'} ${sectionLabel.toLowerCase()}`,
           lesson.title,
         );
       }
     } catch (err) {
-      console.error(`Refine section failed (${subBlock.label}):`, err);
+      console.error(`Refine section failed (${sectionLabel}):`, err);
     } finally {
       setRefiningSections((prev) => {
         const next = new Set(prev);
@@ -2215,16 +1560,6 @@ export default function App() {
         ? { ...prev, signaturePhrases: (prev.signaturePhrases || []).filter((p) => p !== phrase) }
         : prev,
     );
-  };
-
-  // Legacy — matchStyle fallback still uses the mock variants when the API fails.
-  // With the new profile shape we no longer track toneKey, so pick the closest
-  // match from the tone description or default to warm.
-  const inferToneKey = (profile) => {
-    const t = (profile?.tone || '').toLowerCase();
-    if (/crisp|professional|clinical|objective/.test(t)) return 'professional';
-    if (/detailed|rich|specific|precise/.test(t)) return 'detailed';
-    return 'warm';
   };
 
   const handleUpdateCourseOverview = (patch) => {
@@ -2444,18 +1779,11 @@ export default function App() {
               onAddLesson={handleAddLesson}
               onRemoveLesson={handleRemoveLesson}
               onUpdateLesson={handleUpdateLesson}
-              onUpdateSubBlock={handleUpdateSubBlock}
-              onRenameBlock={handleRenameBlock}
-              onDuplicateBlock={handleDuplicateBlock}
-              onConvertToBulletList={handleConvertToBulletList}
-              onDeleteBlock={handleDeleteBlock}
-              expandedBulletIds={expandedBulletIds}
-              onToggleBullet={handleToggleBullet}
-              onAddBlock={handleAddBlock}
               onUpdateBlock={handleUpdateBlock}
+              onInsertBlock={handleInsertBlock}
+              onDeleteBlock={handleDeleteBlock}
+              onDuplicateBlock={handleDuplicateBlock}
               onReorderBlock={handleReorderBlock}
-              onRefineSection={handleRefineSection}
-              refiningSections={refiningSections}
               onAddModule={handleAddModule}
               onUpdateModule={handleUpdateModule}
               onRemoveModule={handleRemoveModule}
