@@ -1,9 +1,9 @@
-// Vite dev-server middleware that mirrors the production Vercel routes.
-// In production, requests to /api/<action> are handled by api/[action].js
-// (a Vercel serverless function). This plugin exists only so `vite` (local
-// dev) responds to the same routes.
+// Vite dev-server middleware that mirrors the production API routes.
+// In production, requests to /api/<action> are handled by Netlify Functions
+// in netlify/functions/. This plugin exists only so `vite` (local dev)
+// responds to the same routes without needing `netlify dev`.
 
-import { HANDLERS, callClaudeForJson } from './api/_lib/handlers.js';
+import { HANDLERS, callClaudeForJson } from './netlify/functions/_lib/handlers.js';
 
 async function readBody(req) {
   return new Promise((resolve, reject) => {

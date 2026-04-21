@@ -1,0 +1,17 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  # Pin to esbuild so ESM `import`/`export` in our function files works
+  # without having to convert them to CJS.
+  node_bundler = "esbuild"
+
+# Keep the frontend's existing /api/<action> URLs working. They now route
+# to the Netlify Functions we just added.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+  force = true
