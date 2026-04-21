@@ -42,3 +42,38 @@ export function applyTheme(id = DEFAULT_THEME_ID) {
   const theme = getTheme(id);
   document.documentElement.setAttribute('data-theme', theme.id);
 }
+
+// ─── Global light/dark mode ───
+// Separate from the course theme system. Dark mode is NOT a theme —
+// it toggles the app chrome only (Topbar / Sidebar / AIPanel / modals
+// / Homepage). Inside [data-surface="themed"] the active course theme
+// overrides, so dark mode doesn't leak into course output.
+
+const MODE_STORAGE_KEY = 'ayuai.mode';
+export const MODES = ['light', 'dark'];
+export const DEFAULT_MODE = 'light';
+
+export function applyMode(mode = DEFAULT_MODE) {
+  if (typeof document === 'undefined') return;
+  const next = mode === 'dark' ? 'dark' : 'light';
+  if (next === 'dark') {
+    document.documentElement.setAttribute('data-mode', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-mode');
+  }
+  try {
+    localStorage.setItem(MODE_STORAGE_KEY, next);
+  } catch {
+    // localStorage can throw in private mode / SSR — ignore.
+  }
+}
+
+export function loadStoredMode() {
+  if (typeof localStorage === 'undefined') return DEFAULT_MODE;
+  try {
+    const raw = localStorage.getItem(MODE_STORAGE_KEY);
+    return MODES.includes(raw) ? raw : DEFAULT_MODE;
+  } catch {
+    return DEFAULT_MODE;
+  }
+}

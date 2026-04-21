@@ -4,7 +4,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter Tight', 'system-ui', 'sans-serif'],
+        // Global app UI uses Inter everywhere. Course themes override
+        // .font-serif / .font-sans inside [data-surface="themed"] via
+        // app.css — Tailwind's utilities still point here by default.
+        sans: ['Inter', 'system-ui', 'sans-serif'],
         serif: ['Cormorant Garamond', 'Georgia', 'serif'],
       },
       // Colors resolve from --app-rgb-* CSS variables (neutral SaaS

@@ -42,7 +42,13 @@ import {
   buildBlocksFromExpandResponse,
   buildExpandSectionsFromBlocks,
 } from './lib/migrateLesson';
-import { applyTheme, DEFAULT_THEME_ID, THEMES } from './themes';
+import {
+  applyTheme,
+  applyMode,
+  loadStoredMode,
+  DEFAULT_THEME_ID,
+  THEMES,
+} from './themes';
 
 // Temporary: surface env + Supabase wiring so prod misconfig is visible.
 if (typeof window !== 'undefined') {
@@ -302,6 +308,7 @@ export default function App() {
   const [lessons, setLessons] = useState([]);
   const [courseOverview, setCourseOverview] = useState(DEFAULT_OVERVIEW);
   const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
+  const [appMode, setAppMode] = useState(loadStoredMode);
 
   // Derived legacy meta (first module) for views that haven't been migrated.
   const moduleMeta = modules[0]
@@ -1597,6 +1604,17 @@ export default function App() {
     );
   };
 
+  // Toggle global light/dark mode. Persists to localStorage via applyMode.
+  // Separate from the course theme system — swap doesn't touch themed
+  // surfaces (editor canvas, student preview).
+  const handleToggleMode = () => {
+    setAppMode((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      applyMode(next);
+      return next;
+    });
+  };
+
   // Instant theme swap: update state + DOM attribute in the same tick.
   // Persistence happens via the existing debounced save (themeId is in the
   // effect's dep array).
@@ -1770,6 +1788,8 @@ export default function App() {
         onBackToDashboard={handleBackToDashboard}
         themeId={themeId}
         onChangeTheme={handleChangeTheme}
+        appMode={appMode}
+        onToggleMode={handleToggleMode}
       />
       <div className="flex flex-1 overflow-hidden">
         {!isTeachScreen && <Sidebar active={activeScreen} onSelect={setActiveScreen} />}

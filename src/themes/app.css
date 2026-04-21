@@ -1,74 +1,72 @@
-/* App chrome tokens — neutral, minimal SaaS palette.
+/* App chrome tokens — global light/dark system.
  *
- * These drive the editor UI (Topbar, Sidebar, Canvas shell, modals).
- * They DO NOT change when the course theme changes.
+ * Drives the entire global UI (Homepage, Topbar, Sidebar, AIPanel,
+ * modals, editor shell). Never beige, never warm. Dark mode is NOT
+ * a course theme — it toggles the app chrome only.
  *
- * Course output (StudentPreview) opts into the active theme by
- * wrapping itself in `[data-surface="themed"]`, which:
- *   1. redirects --app-rgb-* to --bp-rgb-* so every Tailwind color
- *      class cascades from the selected theme, and
- *   2. exposes the canonical token spec (--bg-primary, --text-*,
- *      --font-heading, --radius, --shadow, etc.) and binds them to
- *      the structural hooks (font utilities, data-themed-card,
- *      data-themed-content) used in the course viewer.
+ * Course output (StudentPreview + editor canvas) opts into the
+ * active theme by wrapping in [data-surface="themed"], which
+ * redirects --app-rgb-* to the active theme's --bp-rgb-* tokens.
+ * Inside that scope, dark-mode tokens stop applying — the course
+ * theme takes over.
  *
- * Canonical tokens themselves are declared in the per-theme CSS
- * files under :root[data-theme="<id>"] — one source of truth per
- * theme, no mixing. */
+ * Per the strict token spec:
+ *   --bg-primary / --bg-secondary / --text-primary /
+ *   --text-secondary / --border / --accent
+ * All exposed at the global level for components that consume them
+ * directly, and mirrored as --app-rgb-* RGB channels for Tailwind
+ * utility classes (bg-canvas, text-ink, border-whisper, …). */
 
+/* ─────────── Light mode (default) ─────────── */
 :root {
-  /* Global app chrome — neutral SaaS palette. Drives Sidebar, Topbar,
-   * AIPanel and all editor backgrounds outside a [data-surface="themed"]
-   * scope. Canonical tokens this maps to:
-   *   --bg-primary       #FFFFFF   (canvas)
-   *   --bg-secondary     #F7F7F8   (paper)
-   *   --text-primary     #111111   (ink)
-   *   --text-secondary   #6B7280   (ink-soft)
-   *   --border           #E5E7EB   (whisper)
-   * No warm/beige tones. Beige belongs only inside the Beauty Pro
-   * theme (src/themes/beauty-pro.css), scoped to course surfaces. */
+  /* Canonical tokens (hex) */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f8;
+  --text-primary: #111111;
+  --text-secondary: #6b7280;
+  --border: #e5e7eb;
+  --accent: #111111;
+
+  /* RGB channels for Tailwind's rgb(<channels>/<alpha>) pattern */
   --app-rgb-canvas: 255 255 255;
   --app-rgb-paper: 247 247 248;
   --app-rgb-ink: 17 17 17;
   --app-rgb-ink-soft: 107 114 128;
-  --app-rgb-ink-muted: 113 113 122;
-  --app-rgb-ink-faint: 161 161 170;
-  --app-rgb-accent: 99 102 241;
-  --app-rgb-accent-deep: 67 56 202;
+  --app-rgb-ink-muted: 107 114 128;
+  --app-rgb-ink-faint: 156 163 175;
+  --app-rgb-accent: 17 17 17;
+  --app-rgb-accent-deep: 0 0 0;
   --app-rgb-rose: 239 68 68;
   --app-rgb-whisper: 229 231 235;
 }
 
-/* Homepage-only palette — strict SaaS neutral per canonical spec.
- * Scoped to [data-page="home"] so editor chrome / course viewer
- * stay untouched. Retargets the same Tailwind utility classes the
- * homepage already uses (bg-canvas, text-ink, bg-paper/40,
- * border-whisper, text-ink-soft, text-accent) and remaps
- * .font-serif to Inter so existing headline classes go sans. */
-[data-page='home'] {
-  --app-rgb-canvas: 255 255 255;         /* --bg-primary */
-  --app-rgb-paper: 247 247 248;          /* --bg-secondary */
-  --app-rgb-ink: 17 17 17;               /* --text-primary */
-  --app-rgb-ink-soft: 107 114 128;       /* --text-secondary */
-  --app-rgb-ink-muted: 107 114 128;
-  --app-rgb-ink-faint: 156 163 175;
-  --app-rgb-accent: 17 17 17;            /* --accent (black, not indigo) */
-  --app-rgb-accent-deep: 0 0 0;
-  --app-rgb-whisper: 229 231 235;        /* --border */
+/* ─────────── Dark mode ─────────── */
+:root[data-mode='dark'] {
+  --bg-primary: #0f0f10;
+  --bg-secondary: #18181b;
+  --text-primary: #ffffff;
+  --text-secondary: #a1a1aa;
+  --border: #2a2a2e;
+  --accent: #ffffff;
 
-  /* Inter everywhere on the homepage — SaaS look. The body default
-   * (Inter Tight) would otherwise cascade. */
-  font-family: 'Inter', system-ui, sans-serif;
+  --app-rgb-canvas: 15 15 16;
+  --app-rgb-paper: 24 24 27;
+  --app-rgb-ink: 255 255 255;
+  --app-rgb-ink-soft: 161 161 170;
+  --app-rgb-ink-muted: 161 161 170;
+  --app-rgb-ink-faint: 113 113 122;
+  --app-rgb-accent: 255 255 255;
+  --app-rgb-accent-deep: 228 228 231;
+  --app-rgb-rose: 248 113 113;
+  --app-rgb-whisper: 42 42 46;
 }
 
-[data-page='home'] .font-serif {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-}
-
-/* Themed surface — redirects Tailwind colors to the active theme and
- * wires canonical tokens into the structural hooks. */
+/* ─────────── Themed surface (course-theme cascade) ─────────── */
+/* Wraps course output (StudentPreview + editor canvas). Redirects
+ * --app-rgb-* to the active theme's --bp-rgb-*, so every Tailwind
+ * color class adopts the selected theme. Dark-mode overrides above
+ * don't reach here because the theme tokens overwrite the same
+ * variables at a more specific scope. */
 [data-surface='themed'] {
   --app-rgb-canvas: var(--bp-rgb-canvas);
   --app-rgb-paper: var(--bp-rgb-paper);
@@ -81,17 +79,11 @@
   --app-rgb-rose: var(--bp-rgb-rose);
   --app-rgb-whisper: var(--bp-rgb-whisper);
 
-  /* Canonical structural tokens applied to the themed surface. */
   background-color: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-body);
-  font-size: var(--body-size);
-  line-height: var(--line-height);
 }
 
-/* Map Tailwind font utilities onto canonical theme fonts so existing
- * font-serif / font-sans classes inside the themed surface follow
- * --font-heading / --font-body automatically. No component changes. */
 [data-surface='themed'] .font-serif {
   font-family: var(--font-heading);
 }
@@ -99,16 +91,14 @@
   font-family: var(--font-body);
 }
 
-/* Card surfaces default to Tailwind's `bg-white` across the editor and
- * preview. Within a themed scope, retarget them to --card-bg so lesson
- * cards, block surfaces, popovers etc. follow the theme's card colour
- * (white in most themes, #18181B in Minimal Dark, etc.). */
+/* Card surfaces default to Tailwind's `bg-white`. Within a themed
+ * scope, retarget to --card-bg so lesson cards and block surfaces
+ * follow the theme's card colour. */
 [data-surface='themed'] .bg-white {
   background-color: var(--card-bg);
 }
 
-/* Structural hooks — opt-in via data attributes so we don't globally
- * restyle every card across the whole app. */
+/* Structural hooks — opt-in via data attributes. */
 [data-surface='themed'] [data-themed-card] {
   border-radius: var(--radius);
   box-shadow: var(--shadow);

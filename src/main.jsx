@@ -16,13 +16,17 @@ import './themes/minimal-dark.css';
 import './themes/creator-clean.css';
 import './themes/education-classic.css';
 import './themes/wellness-calm.css';
-import { applyTheme } from './themes';
+import { applyTheme, applyMode, loadStoredMode } from './themes';
 
 // Beauty Pro is the frozen snapshot of the current aesthetic. Setting it
 // early adds `data-theme="beauty-pro"` to <html> so future theme-aware
 // styles scope correctly. Doesn't change visuals until a different theme
 // is applied.
 applyTheme('beauty-pro');
+
+// Restore the user's preferred light/dark mode (stored in localStorage
+// under 'ayuai.mode'). Separate from the course theme system.
+applyMode(loadStoredMode());
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

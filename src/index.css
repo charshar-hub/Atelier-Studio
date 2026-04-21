@@ -15,7 +15,7 @@ body,
 }
 
 body {
-  font-family: 'Inter Tight', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   /* Follows the neutral app chrome — themed surfaces override via
    * [data-surface="themed"]. */
   background-color: rgb(var(--app-rgb-canvas));
