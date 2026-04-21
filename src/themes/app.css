@@ -17,17 +17,26 @@
  * theme, no mixing. */
 
 :root {
-  /* Neutral SaaS defaults (AYUAI editor chrome) */
-  --app-rgb-canvas: 250 250 250;
-  --app-rgb-paper: 244 244 245;
-  --app-rgb-ink: 10 10 10;
-  --app-rgb-ink-soft: 63 63 70;
+  /* Global app chrome — neutral SaaS palette. Drives Sidebar, Topbar,
+   * AIPanel and all editor backgrounds outside a [data-surface="themed"]
+   * scope. Canonical tokens this maps to:
+   *   --bg-primary       #FFFFFF   (canvas)
+   *   --bg-secondary     #F7F7F8   (paper)
+   *   --text-primary     #111111   (ink)
+   *   --text-secondary   #6B7280   (ink-soft)
+   *   --border           #E5E7EB   (whisper)
+   * No warm/beige tones. Beige belongs only inside the Beauty Pro
+   * theme (src/themes/beauty-pro.css), scoped to course surfaces. */
+  --app-rgb-canvas: 255 255 255;
+  --app-rgb-paper: 247 247 248;
+  --app-rgb-ink: 17 17 17;
+  --app-rgb-ink-soft: 107 114 128;
   --app-rgb-ink-muted: 113 113 122;
   --app-rgb-ink-faint: 161 161 170;
   --app-rgb-accent: 99 102 241;
   --app-rgb-accent-deep: 67 56 202;
   --app-rgb-rose: 239 68 68;
-  --app-rgb-whisper: 228 228 231;
+  --app-rgb-whisper: 229 231 235;
 }
 
 /* Homepage-only palette — strict SaaS neutral per canonical spec.
