@@ -40,25 +40,40 @@
   --app-rgb-whisper: 229 231 235;
 }
 
-/* ─────────── Dark mode ─────────── */
+/* ─────────── Dark mode — soft navy-charcoal, layered surfaces ─────────── */
+/* No pure black. Three surface tiers (primary → secondary → surface) so
+ * sidebar sits one step darker than main content, cards one step lighter.
+ * --accent stays white so light-on-dark buttons read crisply. */
 :root[data-mode='dark'] {
-  --bg-primary: #0f0f10;
-  --bg-secondary: #18181b;
-  --text-primary: #ffffff;
-  --text-secondary: #a1a1aa;
-  --border: #2a2a2e;
+  --bg-primary: #0f1115;     /* darkest — used by sidebar (bg-paper) */
+  --bg-secondary: #181a20;   /* middle — main content area (bg-canvas) */
+  --surface: #1f2229;        /* lightest — cards / elevated surfaces */
+  --text-primary: #e6e8ec;
+  --text-secondary: #9ca3af;
+  --border: #2a2f3a;
   --accent: #ffffff;
 
-  --app-rgb-canvas: 15 15 16;
-  --app-rgb-paper: 24 24 27;
-  --app-rgb-ink: 255 255 255;
-  --app-rgb-ink-soft: 161 161 170;
-  --app-rgb-ink-muted: 161 161 170;
-  --app-rgb-ink-faint: 113 113 122;
+  /* Tailwind channels. Note the swap: bg-canvas (main) gets the MIDDLE
+   * surface, bg-paper (sidebar) gets the DARKEST. This keeps sidebar
+   * slightly darker than main, matching the layered-surface rule. */
+  --app-rgb-canvas: 24 26 32;        /* bg-secondary — main content */
+  --app-rgb-paper: 15 17 21;         /* bg-primary   — sidebar */
+  --app-rgb-ink: 230 232 236;
+  --app-rgb-ink-soft: 156 163 175;
+  --app-rgb-ink-muted: 156 163 175;
+  --app-rgb-ink-faint: 120 128 143;
   --app-rgb-accent: 255 255 255;
-  --app-rgb-accent-deep: 228 228 231;
+  --app-rgb-accent-deep: 230 232 236;
   --app-rgb-rose: 248 113 113;
-  --app-rgb-whisper: 42 42 46;
+  --app-rgb-whisper: 42 47 58;
+}
+
+/* `bg-white` Tailwind utility — lift to the lightest surface tier when
+ * in dark mode so cards read as elevated rather than stark white on
+ * dark. The themed-surface rule below wins inside course surfaces, so
+ * Beauty Pro / Soft Dark etc. keep their own --card-bg values. */
+:root[data-mode='dark'] .bg-white {
+  background-color: var(--surface);
 }
 
 /* ─────────── Themed surface (course-theme cascade) ─────────── */
