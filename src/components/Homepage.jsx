@@ -9,6 +9,8 @@
 // • Labels: 12px uppercase, text-ink-soft (resolves to #6B7280 here).
 // • Buttons: rounded-lg (8px), solid black primary, bordered secondary.
 
+import { useEffect, useState } from 'react';
+
 export default function Homepage({ onEnterWorkspace }) {
   return (
     <div
@@ -84,33 +86,318 @@ function NavBar({ onEnterWorkspace }) {
 function Hero({ onEnterWorkspace }) {
   return (
     <section className="border-b border-whisper">
-      <div className="mx-auto flex max-w-[1100px] flex-col items-center px-8 pb-[72px] pt-[96px] text-center">
-        <SectionLabel className="mb-8">AYUAI · Course Studio</SectionLabel>
-        <h1 className="max-w-[900px] text-[56px] font-semibold leading-[1.05] tracking-tight text-ink">
-          Turn what you know into a course that sounds like you.
-        </h1>
-        <p className="mt-8 max-w-[640px] text-[18px] leading-[1.55] text-ink-soft">
-          AYUAI captures your teaching voice, drafts structured lessons around it, and
-          gives you a library of themes to shape how students see the result — without
-          rewriting a word.
-        </p>
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={onEnterWorkspace}
-            className="h-11 rounded-lg bg-ink px-6 text-[14px] font-medium text-canvas transition hover:opacity-90"
-          >
-            Start a course
-          </button>
-          <a
-            href="#how-it-works"
-            className="flex h-11 items-center rounded-lg border border-whisper bg-transparent px-6 text-[14px] font-medium text-ink transition hover:bg-paper"
-          >
-            See how it works
-          </a>
+      <div className="mx-auto grid max-w-[1100px] grid-cols-1 gap-12 px-8 pb-[72px] pt-[96px] md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-center md:gap-16">
+        {/* Left: text + CTAs */}
+        <div>
+          <SectionLabel className="mb-8">AYUAI · Course Studio</SectionLabel>
+          <h1 className="text-[52px] font-semibold leading-[1.05] tracking-tight text-ink md:text-[56px]">
+            Build your course. Watch it come together.
+          </h1>
+          <p className="mt-6 max-w-[560px] text-[18px] leading-[1.55] text-ink-soft">
+            AYUAI turns your ideas into structured lessons, refines your voice, and lets
+            you shape how it looks — without rebuilding anything.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={onEnterWorkspace}
+              className="h-11 rounded-lg bg-ink px-6 text-[14px] font-medium text-canvas transition hover:opacity-90"
+            >
+              Start building
+            </button>
+            <a
+              href="#how-it-works"
+              className="flex h-11 items-center rounded-lg border border-whisper bg-transparent px-6 text-[14px] font-medium text-ink transition hover:bg-paper"
+            >
+              See how it works
+            </a>
+          </div>
         </div>
+
+        {/* Right: product demo */}
+        <DemoPlayer />
       </div>
     </section>
+  );
+}
+
+// ── DemoPlayer ──────────────────────────────────────────────────────────────
+// Animated mock of the product in motion — no video asset required. Cycles
+// through five scenes that each reveal one capability:
+//   0. Generate a lesson
+//   1. AI fills in structured content
+//   2. Match-style refines a block
+//   3. Insert a split layout (image + text)
+//   4. Swap themes — the mock surface retints through three palettes
+// The mock uses skeleton bars for body text so it reads as real product
+// activity without requiring copy in multiple languages.
+
+const DEMO_PALETTES = [
+  // Neutral baseline — the default look.
+  { key: 'neutral', bg: '#ffffff', border: '#e5e7eb', text: '#111111', muted: '#6b7280', chip: '#f3f4f6', accent: '#111111' },
+  // Beauty Pro
+  { key: 'beauty', bg: '#f7f3ee', border: '#e5d9cc', text: '#2b2118', muted: '#6b5b4d', chip: '#efe7de', accent: '#b89b7a' },
+  // Soft Dark
+  { key: 'dark', bg: '#1c1d21', border: '#343741', text: '#e8eaf0', muted: '#a1a6b3', chip: '#2a2d34', accent: '#ffffff' },
+  // Education Classic
+  { key: 'edu', bg: '#ffffff', border: '#e2e8f0', text: '#0f172a', muted: '#475569', chip: '#f1f5f9', accent: '#2563eb' },
+];
+
+// Scene schedule. Total loop ≈ 16s. Scene 4 is split into sub-frames so
+// the theme swap feels like three distinct clicks.
+const SCENES = [
+  { id: 'generate', ms: 2400, palette: 0 },
+  { id: 'content', ms: 3200, palette: 0 },
+  { id: 'refine', ms: 2800, palette: 0 },
+  { id: 'split', ms: 2800, palette: 0 },
+  { id: 'theme-beauty', ms: 1400, palette: 1 },
+  { id: 'theme-dark', ms: 1400, palette: 2 },
+  { id: 'theme-edu', ms: 1400, palette: 3 },
+];
+
+function DemoPlayer() {
+  const [sceneIdx, setSceneIdx] = useState(0);
+  const scene = SCENES[sceneIdx];
+  const palette = DEMO_PALETTES[scene.palette];
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSceneIdx((i) => (i + 1) % SCENES.length);
+    }, scene.ms);
+    return () => clearTimeout(t);
+  }, [sceneIdx, scene.ms]);
+
+  return (
+    <div className="relative">
+      {/* Outer frame — the "video container" */}
+      <div
+        className="relative overflow-hidden rounded-xl border border-whisper shadow-[0_10px_40px_-20px_rgba(17,17,17,0.18)]"
+        style={{ aspectRatio: '4 / 3' }}
+      >
+        {/* Stage surface — retints on theme scenes */}
+        <div
+          className="absolute inset-0 transition-colors duration-700"
+          style={{ backgroundColor: palette.bg }}
+        >
+          {/* Faux topbar */}
+          <div
+            className="flex items-center gap-2 border-b px-4 py-2.5 transition-colors duration-700"
+            style={{ borderColor: palette.border }}
+          >
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.border }} />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.border }} />
+            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: palette.border }} />
+            <div
+              className="ml-3 flex h-5 min-w-[140px] items-center rounded-md px-2 text-[10px] transition-colors duration-700"
+              style={{ backgroundColor: palette.chip, color: palette.muted }}
+            >
+              Lesson · Brow mapping
+            </div>
+            {/* Theme chip — pulses during theme scenes */}
+            <div
+              className={`ml-auto flex h-5 items-center gap-1.5 rounded-full px-2 text-[9px] font-medium uppercase tracking-wider transition-all duration-500 ${
+                scene.id.startsWith('theme-') ? 'scale-105 ring-2' : ''
+              }`}
+              style={{
+                backgroundColor: palette.chip,
+                color: palette.muted,
+                boxShadow: scene.id.startsWith('theme-')
+                  ? `0 0 0 2px ${palette.accent}40`
+                  : 'none',
+              }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: palette.accent }} />
+              Theme
+            </div>
+          </div>
+
+          {/* Body — split into canvas + AI panel */}
+          <div className="grid h-[calc(100%-37px)] grid-cols-[minmax(0,1fr)_90px]">
+            {/* Canvas */}
+            <div className="overflow-hidden p-4">
+              <Card palette={palette}>
+                <TitleLine palette={palette} active={sceneIdx >= 1} />
+                <div className="mt-3 space-y-2">
+                  <Block
+                    palette={palette}
+                    show={sceneIdx >= 1}
+                    delay={0}
+                    refining={scene.id === 'refine'}
+                  />
+                  <Block palette={palette} show={sceneIdx >= 1} delay={200} widths={[0.95, 0.75]} />
+                  <Block palette={palette} show={sceneIdx >= 1} delay={400} widths={[0.85, 0.6]} />
+                </div>
+                {/* Split layout appears in scene 3 and stays */}
+                <SplitInsert palette={palette} show={sceneIdx >= 3} />
+              </Card>
+            </div>
+
+            {/* AI panel */}
+            <div
+              className="border-l p-3 transition-colors duration-700"
+              style={{ borderColor: palette.border, backgroundColor: palette.chip }}
+            >
+              <div
+                className="mb-2 text-[8px] font-medium uppercase tracking-wider transition-colors duration-700"
+                style={{ color: palette.muted }}
+              >
+                AI
+              </div>
+              <ActionButton
+                palette={palette}
+                label="Generate"
+                pulse={scene.id === 'generate'}
+                filled={scene.id === 'generate'}
+              />
+              <ActionButton palette={palette} label="Structure" />
+              <ActionButton
+                palette={palette}
+                label="Match style"
+                pulse={scene.id === 'refine'}
+              />
+              <ActionButton
+                palette={palette}
+                label="Split layout"
+                pulse={scene.id === 'split'}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Scene progress indicator */}
+      <div className="mt-3 flex items-center gap-1.5">
+        {SCENES.map((s, i) => (
+          <span
+            key={s.id}
+            className="h-0.5 flex-1 rounded-full transition-all duration-500"
+            style={{
+              backgroundColor: i === sceneIdx ? '#111111' : '#E5E7EB',
+            }}
+          />
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] uppercase tracking-[0.12em] text-ink-soft">
+        Product tour · plays automatically
+      </p>
+    </div>
+  );
+}
+
+function Card({ palette, children }) {
+  return (
+    <div
+      className="h-full overflow-hidden rounded-md border p-3 transition-colors duration-700"
+      style={{ borderColor: palette.border, backgroundColor: palette.bg }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function TitleLine({ palette, active }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="block h-2.5 rounded-sm transition-all duration-700"
+        style={{
+          width: active ? '120px' : '40px',
+          backgroundColor: palette.text,
+          opacity: active ? 1 : 0.3,
+        }}
+      />
+      <span
+        className="block h-2.5 rounded-sm transition-all duration-700"
+        style={{
+          width: active ? '80px' : '0px',
+          backgroundColor: palette.text,
+          opacity: active ? 0.7 : 0,
+        }}
+      />
+    </div>
+  );
+}
+
+function Block({ palette, show, delay = 0, widths = [1, 0.8], refining = false }) {
+  return (
+    <div
+      className="space-y-1.5 transition-all duration-500"
+      style={{
+        opacity: show ? 1 : 0,
+        transform: show ? 'translateY(0)' : 'translateY(4px)',
+        transitionDelay: `${delay}ms`,
+      }}
+    >
+      {widths.map((w, i) => (
+        <span
+          key={i}
+          className="block h-1.5 rounded-full transition-all duration-700"
+          style={{
+            width: `${w * 100}%`,
+            backgroundColor: palette.muted,
+            opacity: refining ? 0.55 : 0.85,
+            filter: refining ? 'blur(0.4px)' : 'none',
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SplitInsert({ palette, show }) {
+  return (
+    <div
+      className="mt-3 grid grid-cols-2 gap-2 transition-all duration-500"
+      style={{
+        opacity: show ? 1 : 0,
+        transform: show ? 'translateY(0)' : 'translateY(6px)',
+        maxHeight: show ? '100px' : '0',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        className="flex h-[56px] items-center justify-center rounded-sm transition-colors duration-700"
+        style={{ backgroundColor: palette.chip }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={palette.muted} strokeWidth="1.5">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="8.5" cy="8.5" r="1.5" />
+          <path d="M21 15l-5-5L5 21" />
+        </svg>
+      </div>
+      <div className="space-y-1.5 pt-1">
+        <span
+          className="block h-1.5 w-full rounded-full"
+          style={{ backgroundColor: palette.muted, opacity: 0.85 }}
+        />
+        <span
+          className="block h-1.5 w-[80%] rounded-full"
+          style={{ backgroundColor: palette.muted, opacity: 0.85 }}
+        />
+        <span
+          className="block h-1.5 w-[60%] rounded-full"
+          style={{ backgroundColor: palette.muted, opacity: 0.85 }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ActionButton({ palette, label, pulse = false, filled = false }) {
+  return (
+    <div
+      className={`mb-1.5 flex h-6 items-center rounded-md px-2 text-[9px] font-medium transition-all duration-500 ${
+        pulse ? 'scale-[1.02]' : ''
+      }`}
+      style={{
+        backgroundColor: filled ? palette.accent : palette.bg,
+        border: `1px solid ${palette.border}`,
+        color: filled ? palette.bg : palette.muted,
+        boxShadow: pulse ? `0 0 0 3px ${palette.accent}20` : 'none',
+      }}
+    >
+      {label}
+    </div>
   );
 }
 
