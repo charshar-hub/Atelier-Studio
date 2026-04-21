@@ -12,7 +12,6 @@ import App from './App.jsx';
 import './index.css';
 import './themes/app.css';
 import './themes/beauty-pro.css';
-import './themes/editorial.css';
 import './themes/minimal-dark.css';
 import './themes/creator-clean.css';
 import './themes/education-classic.css';

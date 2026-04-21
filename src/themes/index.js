@@ -5,15 +5,14 @@
 // aesthetic, add a new file under src/themes/ and register it here.
 
 import { beautyPro } from './beauty-pro';
-import { editorial } from './editorial';
 import { minimalDark } from './minimal-dark';
 import { creatorClean } from './creator-clean';
 import { educationClassic } from './education-classic';
 import { wellnessCalm } from './wellness-calm';
 
+// Registry matches the canonical theme spec — five named themes only.
 export const THEMES = Object.freeze({
   'beauty-pro': beautyPro,
-  editorial,
   'minimal-dark': minimalDark,
   'creator-clean': creatorClean,
   'education-classic': educationClassic,
@@ -23,7 +22,6 @@ export const THEMES = Object.freeze({
 // Ordered for UI pickers.
 export const THEME_LIST = Object.freeze([
   beautyPro,
-  editorial,
   minimalDark,
   creatorClean,
   educationClassic,

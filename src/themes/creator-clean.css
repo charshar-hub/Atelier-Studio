@@ -1,27 +1,38 @@
-/* Creator Clean — white canvas, visual-first, subtle grayscale borders. */
+/* Creator Clean — pure white, greyscale, bordered cards, sans-serif. */
 
-[data-theme='creator-clean'] {
+:root[data-theme='creator-clean'],
+[data-theme='creator-clean'] [data-surface='themed'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f8;
+  --text-primary: #111111;
+  --text-secondary: #6b7280;
+  --accent: #111111;
+  --border: #e5e7eb;
+  --card-bg: #ffffff;
+
+  --font-heading: 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --h1-size: 40px;
+  --h2-size: 26px;
+  --body-size: 15px;
+  --line-height: 1.6;
+
+  --section-padding: 40px;
+  --block-gap: 20px;
+  --card-padding: 20px;
+
+  --radius: 8px;
+  --shadow: none;
+  --border-style: 1px solid var(--border);
+
   --bp-rgb-canvas: 255 255 255;
-  --bp-rgb-paper: 249 250 251;
-  --bp-rgb-ink: 17 24 39;
-  --bp-rgb-ink-soft: 55 65 81;
+  --bp-rgb-paper: 247 247 248;
+  --bp-rgb-ink: 17 17 17;
+  --bp-rgb-ink-soft: 107 114 128;
   --bp-rgb-ink-muted: 107 114 128;
   --bp-rgb-ink-faint: 156 163 175;
-  --bp-rgb-accent: 17 24 39;
+  --bp-rgb-accent: 17 17 17;
   --bp-rgb-accent-deep: 0 0 0;
   --bp-rgb-rose: 236 72 153;
   --bp-rgb-whisper: 229 231 235;
-}
-
-/* Sans display for a contemporary creator feel, slightly wider article
- * column, crisp 4px corners, no shadows. */
-[data-theme='creator-clean'] [data-surface='themed'] {
-  --bp-font-display: 'Space Grotesk', system-ui, sans-serif;
-  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
-  --bp-tracking-display: -0.015em;
-  --bp-radius-card: 4px;
-  --bp-shadow-card: none;
-  --bp-content-pad-x: 4rem;
-  --bp-content-pad-y: 3rem;
-  --bp-article-max: 820px;
 }

@@ -1,27 +1,38 @@
-/* Education Classic — soft slate canvas, trusted blue accent. */
+/* Education Classic — slate canvas, serif Georgia headings, blue accent. */
 
-[data-theme='education-classic'] {
-  --bp-rgb-canvas: 248 250 252;
-  --bp-rgb-paper: 226 232 240;
+:root[data-theme='education-classic'],
+[data-theme='education-classic'] [data-surface='themed'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --accent: #2563eb;
+  --border: #e2e8f0;
+  --card-bg: #ffffff;
+
+  --font-heading: 'Georgia', 'Times New Roman', serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --h1-size: 42px;
+  --h2-size: 28px;
+  --body-size: 16px;
+  --line-height: 1.7;
+
+  --section-padding: 36px;
+  --block-gap: 18px;
+  --card-padding: 20px;
+
+  --radius: 8px;
+  --shadow: none;
+  --border-style: 1px solid var(--border);
+
+  --bp-rgb-canvas: 255 255 255;
+  --bp-rgb-paper: 241 245 249;
   --bp-rgb-ink: 15 23 42;
-  --bp-rgb-ink-soft: 51 65 85;
+  --bp-rgb-ink-soft: 71 85 105;
   --bp-rgb-ink-muted: 100 116 139;
   --bp-rgb-ink-faint: 148 163 184;
   --bp-rgb-accent: 37 99 235;
   --bp-rgb-accent-deep: 29 78 216;
   --bp-rgb-rose: 220 38 38;
-  --bp-rgb-whisper: 203 213 225;
-}
-
-/* Traditional course look: serif display for trust, light shadow, a
- * medium radius. Matches textbook / academic legibility norms. */
-[data-theme='education-classic'] [data-surface='themed'] {
-  --bp-font-display: 'Cormorant Garamond', Georgia, serif;
-  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
-  --bp-tracking-display: -0.005em;
-  --bp-radius-card: 6px;
-  --bp-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05);
-  --bp-content-pad-x: 4rem;
-  --bp-content-pad-y: 3.5rem;
-  --bp-article-max: 720px;
+  --bp-rgb-whisper: 226 232 240;
 }

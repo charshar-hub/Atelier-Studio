@@ -1,79 +1,54 @@
-/* Beauty Pro — CSS custom properties snapshot.
+/* Beauty Pro — canonical token definition.
  *
- * Scoped to both `:root` (so the tokens are always present as defaults)
- * and `[data-theme="beauty-pro"]` (so the theme can be re-applied
- * explicitly once other themes exist).
+ * Source of truth. Do not hardcode beauty-pro colors, fonts, or
+ * spacing anywhere else — everything reads from the tokens declared
+ * here.
  *
- * Currently NO component consumes these variables directly — the existing
- * Tailwind classes still resolve to their hex values from tailwind.config.js
- * for bit-identical visual output. The variables are a durable reference
- * for future theme swaps and for inline styles in theme-aware components. */
+ * Scoped to both the global :root[data-theme="beauty-pro"] (per
+ * the strict token spec) and the [data-theme="beauty-pro"]
+ * [data-surface="themed"] sub-scope used by the bridge rules in
+ * app.css. Both selectors see the same values. */
 
-:root,
-[data-theme='beauty-pro'] {
-  /* RGB channels — the canonical form Tailwind resolves against. Keeping
-   * both `--bp-color-*` hex tokens (for JS / inline styles) and
-   * `--bp-rgb-*` channel tokens (for Tailwind's rgb(<channels>/<alpha>)
-   * pattern) means opacity modifiers like bg-paper/40 keep working. */
-  --bp-rgb-canvas: 250 246 240;
-  --bp-rgb-paper: 243 236 225;
-  --bp-rgb-ink: 43 33 24;
-  --bp-rgb-ink-soft: 90 74 63;
-  --bp-rgb-ink-muted: 138 118 102;
-  --bp-rgb-ink-faint: 138 118 102;
-  --bp-rgb-accent: 184 147 106;
-  --bp-rgb-accent-deep: 138 106 71;
-  --bp-rgb-rose: 212 168 154;
-  --bp-rgb-whisper: 232 223 210;
-
-  /* Backgrounds */
-  --bp-color-canvas: #faf6f0;
-  --bp-color-paper: #f3ece1;
-
-  /* Text tiers */
-  --bp-color-ink: #2b2118;
-  --bp-color-ink-soft: #5a4a3f;
-  --bp-color-ink-muted: #8a7666;
-  --bp-color-ink-faint: #8a7666;
-  --bp-color-body-text: #3a2e26;
-
-  /* Accents */
-  --bp-color-accent: #b8936a;
-  --bp-color-accent-deep: #8a6a47;
-  --bp-color-rose: #d4a89a;
-  --bp-color-whisper: #e8dfd2;
-
-  /* Intent surfaces (opacity-baked) */
-  --bp-color-tip-border: rgba(212, 168, 154, 0.3);
-  --bp-color-callout-border: rgba(184, 147, 106, 0.3);
-  --bp-color-callout-surface: rgba(243, 236, 225, 0.6);
-  --bp-color-focus-ring: rgba(184, 147, 106, 0.08);
-  --bp-color-focus-ring-firm: rgba(184, 147, 106, 0.16);
+:root[data-theme='beauty-pro'],
+[data-theme='beauty-pro'] [data-surface='themed'] {
+  /* Colors */
+  --bg-primary: #f7f3ee;
+  --bg-secondary: #efe7de;
+  --text-primary: #2b2118;
+  --text-secondary: #6b5b4d;
+  --accent: #b89b7a;
+  --border: #e5d9cc;
+  --card-bg: #ffffff;
 
   /* Typography */
-  --bp-font-sans: 'Inter Tight', system-ui, sans-serif;
-  --bp-font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-heading: 'Playfair Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --h1-size: 48px;
+  --h2-size: 32px;
+  --body-size: 16px;
+  --line-height: 1.7;
 
-  /* Radii */
-  --bp-radius-sm: 6px;
-  --bp-radius-md: 10px;
-  --bp-radius-lg: 12px;
-  --bp-radius-xl: 14px;
-  --bp-radius-pill: 9999px;
+  /* Spacing */
+  --section-padding: 48px;
+  --block-gap: 24px;
+  --card-padding: 24px;
 
-  /* Shadows */
-  --bp-shadow-card: 0 1px 3px rgba(58, 46, 38, 0.04);
-  --bp-shadow-card-subtle: 0 1px 3px rgba(58, 46, 38, 0.03);
-  --bp-shadow-card-hover: 0 4px 16px -8px rgba(58, 46, 38, 0.08);
-  --bp-shadow-popover: 0 8px 28px -12px rgba(58, 46, 38, 0.2);
-  --bp-shadow-toolbar: 0 4px 16px -6px rgba(58, 46, 38, 0.18);
-  --bp-shadow-deep: 0 6px 20px -10px rgba(58, 46, 38, 0.25);
-  --bp-shadow-welcome: 0 2px 10px rgba(58, 46, 38, 0.18);
-  --bp-shadow-focus-ring: 0 0 0 3px rgba(184, 147, 106, 0.08);
+  /* Component */
+  --radius: 16px;
+  --shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  --border-style: none;
 
-  /* Motion */
-  --bp-motion-fade-up: fade-up 260ms ease-out;
-  --bp-motion-slide-right: slide-in-right 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  --bp-motion-slide-left: slide-in-left 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
-  --bp-motion-hover: 150ms ease-out;
+  /* RGB channels — derived from canonical hex values so existing
+   * Tailwind utility classes (bg-canvas, text-ink, border-whisper,
+   * etc.) continue to work with /<alpha-value> opacity modifiers. */
+  --bp-rgb-canvas: 247 243 238;
+  --bp-rgb-paper: 239 231 222;
+  --bp-rgb-ink: 43 33 24;
+  --bp-rgb-ink-soft: 107 91 77;
+  --bp-rgb-ink-muted: 107 91 77;
+  --bp-rgb-ink-faint: 143 127 113;
+  --bp-rgb-accent: 184 155 122;
+  --bp-rgb-accent-deep: 140 115 85;
+  --bp-rgb-rose: 212 168 154;
+  --bp-rgb-whisper: 229 217 204;
 }

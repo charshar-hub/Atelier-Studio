@@ -1,27 +1,38 @@
-/* Wellness Calm — sage green on warm off-white, airy and gentle. */
+/* Wellness Calm — soft green canvas, DM Serif Display headings, airy spacing. */
 
-[data-theme='wellness-calm'] {
-  --bp-rgb-canvas: 247 249 245;
-  --bp-rgb-paper: 232 239 228;
-  --bp-rgb-ink: 31 43 34;
-  --bp-rgb-ink-soft: 74 90 78;
+:root[data-theme='wellness-calm'],
+[data-theme='wellness-calm'] [data-surface='themed'] {
+  --bg-primary: #f6f8f6;
+  --bg-secondary: #e8efea;
+  --text-primary: #1f2a24;
+  --text-secondary: #5f6f66;
+  --accent: #7daa92;
+  --border: #d6e2da;
+  --card-bg: #ffffff;
+
+  --font-heading: 'DM Serif Display', Georgia, serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --h1-size: 44px;
+  --h2-size: 30px;
+  --body-size: 16px;
+  --line-height: 1.8;
+
+  --section-padding: 48px;
+  --block-gap: 24px;
+  --card-padding: 24px;
+
+  --radius: 20px;
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.03);
+  --border-style: none;
+
+  --bp-rgb-canvas: 246 248 246;
+  --bp-rgb-paper: 232 239 234;
+  --bp-rgb-ink: 31 42 36;
+  --bp-rgb-ink-soft: 95 111 102;
   --bp-rgb-ink-muted: 122 139 126;
   --bp-rgb-ink-faint: 163 180 167;
-  --bp-rgb-accent: 107 142 111;
-  --bp-rgb-accent-deep: 79 109 83;
+  --bp-rgb-accent: 125 170 146;
+  --bp-rgb-accent-deep: 95 140 116;
   --bp-rgb-rose: 200 165 160;
-  --bp-rgb-whisper: 213 221 209;
-}
-
-/* Airy: soft serif display, generous vertical padding, pillow-rounded
- * cards, very subtle shadow. */
-[data-theme='wellness-calm'] [data-surface='themed'] {
-  --bp-font-display: 'DM Serif Display', Georgia, serif;
-  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
-  --bp-tracking-display: -0.005em;
-  --bp-radius-card: 16px;
-  --bp-shadow-card: 0 1px 4px rgba(31, 43, 34, 0.04);
-  --bp-content-pad-x: 5rem;
-  --bp-content-pad-y: 5rem;
-  --bp-article-max: 700px;
+  --bp-rgb-whisper: 214 226 218;
 }

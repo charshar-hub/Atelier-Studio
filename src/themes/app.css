@@ -1,19 +1,23 @@
 /* App chrome tokens — neutral, minimal SaaS palette.
  *
- * These drive the editor UI (Topbar, Sidebar, Canvas shell, modals,
- * block editor). They DO NOT change when the course theme changes.
+ * These drive the editor UI (Topbar, Sidebar, Canvas shell, modals).
+ * They DO NOT change when the course theme changes.
  *
  * Course output (StudentPreview) opts into the active theme by
- * wrapping itself in `[data-surface="themed"]`, which redirects
- * --app-rgb-* to --bp-rgb-* so every Tailwind color class cascades
- * from the selected theme inside that scope.
+ * wrapping itself in `[data-surface="themed"]`, which:
+ *   1. redirects --app-rgb-* to --bp-rgb-* so every Tailwind color
+ *      class cascades from the selected theme, and
+ *   2. exposes the canonical token spec (--bg-primary, --text-*,
+ *      --font-heading, --radius, --shadow, etc.) and binds them to
+ *      the structural hooks (font utilities, data-themed-card,
+ *      data-themed-content) used in the course viewer.
  *
- * Naming kept compatible with the existing Tailwind token names
- * (canvas, paper, ink, whisper, etc.) so no component needs to change
- * class strings. */
+ * Canonical tokens themselves are declared in the per-theme CSS
+ * files under :root[data-theme="<id>"] — one source of truth per
+ * theme, no mixing. */
 
 :root {
-  /* Neutral SaaS palette (zinc-family + indigo accent) */
+  /* Neutral SaaS defaults (AYUAI editor chrome) */
   --app-rgb-canvas: 250 250 250;
   --app-rgb-paper: 244 244 245;
   --app-rgb-ink: 10 10 10;
@@ -26,15 +30,9 @@
   --app-rgb-whisper: 228 228 231;
 }
 
-/* Themed surface: any subtree marked `data-surface="themed"` redirects
- * the app tokens to the active course theme's tokens, so everything
- * inside re-reads theme colors without changing class names.
- *
- * Also declares structural tokens (font, radius, shadow, content
- * padding) with Beauty-Pro defaults. Each theme overrides these at
- * [data-theme="<id>"] [data-surface="themed"] scope. */
+/* Themed surface — redirects Tailwind colors to the active theme and
+ * wires canonical tokens into the structural hooks. */
 [data-surface='themed'] {
-  /* Colors cascade from active theme */
   --app-rgb-canvas: var(--bp-rgb-canvas);
   --app-rgb-paper: var(--bp-rgb-paper);
   --app-rgb-ink: var(--bp-rgb-ink);
@@ -46,42 +44,40 @@
   --app-rgb-rose: var(--bp-rgb-rose);
   --app-rgb-whisper: var(--bp-rgb-whisper);
 
-  /* Structural — Beauty Pro defaults. Each theme overrides these. */
-  --bp-font-display: 'Cormorant Garamond', Georgia, serif;
-  --bp-font-body: 'Inter Tight', system-ui, sans-serif;
-  --bp-tracking-display: -0.01em;
-  --bp-radius-card: 12px;
-  --bp-shadow-card: 0 1px 3px rgba(58, 46, 38, 0.04);
-  --bp-content-pad-x: 4rem;
-  --bp-content-pad-y: 3.5rem;
-  --bp-article-max: 740px;
-
-  font-family: var(--bp-font-body);
+  /* Canonical structural tokens applied to the themed surface. */
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  font-size: var(--body-size);
+  line-height: var(--line-height);
 }
 
-/* Map existing Tailwind font utilities onto the themed fonts so every
- * font-serif / font-sans class inside a themed surface follows the
- * active theme without component-level changes. */
+/* Map Tailwind font utilities onto canonical theme fonts so existing
+ * font-serif / font-sans classes inside the themed surface follow
+ * --font-heading / --font-body automatically. No component changes. */
 [data-surface='themed'] .font-serif {
-  font-family: var(--bp-font-display);
-  letter-spacing: var(--bp-tracking-display);
+  font-family: var(--font-heading);
 }
 [data-surface='themed'] .font-sans {
-  font-family: var(--bp-font-body);
+  font-family: var(--font-body);
 }
 
-/* Explicit structural hooks — opt-in via data attributes so we don't
- * globally restyle every rounded-lg across the app. */
+/* Structural hooks — opt-in via data attributes so we don't globally
+ * restyle every card across the whole app. */
 [data-surface='themed'] [data-themed-card] {
-  border-radius: var(--bp-radius-card);
-  box-shadow: var(--bp-shadow-card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+[data-surface='themed'] [data-themed-surface] {
+  background-color: var(--card-bg);
+  border: var(--border-style);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--card-padding);
 }
 [data-surface='themed'] [data-themed-content] {
-  padding-left: var(--bp-content-pad-x);
-  padding-right: var(--bp-content-pad-x);
-  padding-top: var(--bp-content-pad-y);
-  padding-bottom: var(--bp-content-pad-y);
+  padding: var(--section-padding);
 }
-[data-surface='themed'] [data-themed-article] {
-  max-width: var(--bp-article-max);
+[data-surface='themed'] [data-themed-stack] > * + * {
+  margin-top: var(--block-gap);
 }
