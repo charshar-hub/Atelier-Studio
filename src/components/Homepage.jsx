@@ -5,7 +5,13 @@
 
 export default function Homepage({ onEnterWorkspace }) {
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-canvas text-ink">
+    // data-page="home" scopes the SaaS-neutral palette (white canvas,
+    // black ink/accent, Inter for all type) to the homepage only.
+    // See [data-page="home"] rules in src/themes/app.css.
+    <div
+      data-page="home"
+      className="min-h-screen w-full overflow-x-hidden bg-canvas text-ink"
+    >
       <NavBar onEnterWorkspace={onEnterWorkspace} />
       <Hero onEnterWorkspace={onEnterWorkspace} />
       <Pillars />
