@@ -16,9 +16,10 @@ body,
 
 body {
   font-family: 'Inter Tight', system-ui, sans-serif;
-  /* Follows the active theme — defaults to Beauty Pro's canvas via :root */
-  background-color: rgb(var(--bp-rgb-canvas));
-  color: rgb(var(--bp-rgb-ink));
+  /* Follows the neutral app chrome — themed surfaces override via
+   * [data-surface="themed"]. */
+  background-color: rgb(var(--app-rgb-canvas));
+  color: rgb(var(--app-rgb-ink));
   -webkit-font-smoothing: antialiased;
 }
 

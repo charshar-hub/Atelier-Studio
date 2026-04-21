@@ -28,7 +28,7 @@ export default function Topbar({
           <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-accent">
             <span className="font-serif italic text-base text-canvas">a</span>
           </div>
-          <span className="ml-2 font-serif text-[17px] tracking-wide">Atelier</span>
+          <span className="ml-2 font-serif text-[17px] tracking-wide">AYUAI</span>
           <span className="ml-2 text-[10px] tracking-[0.2em] text-accent">STUDIO</span>
         </button>
         {onBackToDashboard && (

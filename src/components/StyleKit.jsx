@@ -98,7 +98,7 @@ export default function StyleKit({
           Your Voice
         </h1>
         <p className="max-w-[640px] text-[15px] leading-[1.7] text-ink-soft">
-          Shape how you sound. Atelier learns from something you've written and carries that
+          Shape how you sound. AYUAI learns from something you've written and carries that
           voice into every lesson.
         </p>
       </div>
@@ -397,7 +397,7 @@ function SignatureVoiceCard({ phrases, onAdd, onRemove }) {
         <span className="text-[10px] tracking-[0.2em] text-ink-muted">YOUR PHRASES</span>
       </div>
       <p className="mb-6 max-w-[560px] text-[13px] leading-[1.65] text-ink-soft">
-        The phrases you naturally reach for. Atelier weaves them back into every lesson.
+        The phrases you naturally reach for. AYUAI weaves them back into every lesson.
       </p>
 
       <div className="flex flex-wrap items-center gap-2.5">

@@ -7,21 +7,22 @@ export default {
         sans: ['Inter Tight', 'system-ui', 'sans-serif'],
         serif: ['Cormorant Garamond', 'Georgia', 'serif'],
       },
-      // Colors resolve from --bp-rgb-* CSS variables so themes can swap by
-      // overriding the variables under [data-theme="<id>"]. The RGB channel
-      // form keeps Tailwind's /<alpha> opacity modifiers working.
-      // Defaults (Beauty Pro) live in src/themes/beauty-pro.css.
+      // Colors resolve from --app-rgb-* CSS variables (neutral SaaS
+      // defaults, see src/themes/app.css). Subtrees marked
+      // data-surface="themed" cascade the active course theme
+      // (--bp-rgb-*) into these same tokens, so ReadOnlyBlock output
+      // inherits Beauty Pro / Editorial / etc. without class changes.
       colors: {
-        canvas: 'rgb(var(--bp-rgb-canvas) / <alpha-value>)',
-        paper: 'rgb(var(--bp-rgb-paper) / <alpha-value>)',
-        ink: 'rgb(var(--bp-rgb-ink) / <alpha-value>)',
-        'ink-soft': 'rgb(var(--bp-rgb-ink-soft) / <alpha-value>)',
-        'ink-muted': 'rgb(var(--bp-rgb-ink-muted) / <alpha-value>)',
-        'ink-faint': 'rgb(var(--bp-rgb-ink-faint) / <alpha-value>)',
-        accent: 'rgb(var(--bp-rgb-accent) / <alpha-value>)',
-        'accent-deep': 'rgb(var(--bp-rgb-accent-deep) / <alpha-value>)',
-        rose: 'rgb(var(--bp-rgb-rose) / <alpha-value>)',
-        whisper: 'rgb(var(--bp-rgb-whisper) / <alpha-value>)',
+        canvas: 'rgb(var(--app-rgb-canvas) / <alpha-value>)',
+        paper: 'rgb(var(--app-rgb-paper) / <alpha-value>)',
+        ink: 'rgb(var(--app-rgb-ink) / <alpha-value>)',
+        'ink-soft': 'rgb(var(--app-rgb-ink-soft) / <alpha-value>)',
+        'ink-muted': 'rgb(var(--app-rgb-ink-muted) / <alpha-value>)',
+        'ink-faint': 'rgb(var(--app-rgb-ink-faint) / <alpha-value>)',
+        accent: 'rgb(var(--app-rgb-accent) / <alpha-value>)',
+        'accent-deep': 'rgb(var(--app-rgb-accent-deep) / <alpha-value>)',
+        rose: 'rgb(var(--app-rgb-rose) / <alpha-value>)',
+        whisper: 'rgb(var(--app-rgb-whisper) / <alpha-value>)',
       },
       keyframes: {
         'fade-up': {

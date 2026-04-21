@@ -70,7 +70,13 @@ export default function StudentPreview({ courseTitle, moduleMeta, lessons, onExi
   };
 
   return (
-    <div className="flex h-screen w-full flex-col bg-canvas text-ink">
+    // data-surface="themed" redirects --app-rgb-* → --bp-rgb-* within the
+    // student preview so the course output inherits the active theme
+    // while the surrounding editor chrome stays neutral.
+    <div
+      data-surface="themed"
+      className="flex h-screen w-full flex-col bg-canvas text-ink"
+    >
       <header className="flex h-14 flex-shrink-0 items-center justify-between border-b border-whisper bg-canvas px-6">
         <button
           onClick={onExit}

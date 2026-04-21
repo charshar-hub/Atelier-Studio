@@ -100,7 +100,7 @@ function Header({ onCancel }) {
         <div className="flex h-[26px] w-[26px] items-center justify-center rounded-full bg-accent">
           <span className="font-serif italic text-base leading-none text-canvas">a</span>
         </div>
-        <span className="ml-2 font-serif text-[17px] leading-none tracking-wide">Atelier</span>
+        <span className="ml-2 font-serif text-[17px] leading-none tracking-wide">AYUAI</span>
         <span className="ml-2 text-[10px] leading-none tracking-[0.2em] text-accent">STUDIO</span>
       </div>
       <button

@@ -24,7 +24,7 @@ function NavBar({ onEnterWorkspace }) {
               <span className="font-serif italic text-base leading-none text-canvas">a</span>
             </div>
             <span className="ml-2.5 font-serif text-[18px] leading-none tracking-wide">
-              Atelier
+              AYUAI
             </span>
             <span className="ml-2 text-[10px] leading-none tracking-[0.25em] text-accent">
               STUDIO
@@ -82,7 +82,7 @@ function Hero({ onEnterWorkspace }) {
             months.
           </h1>
           <p className="mx-auto mb-9 max-w-[620px] text-[18px] leading-[1.6] text-ink-soft">
-            Capture how you teach once. Atelier generates lessons, rewrites sections, and shapes
+            Capture how you teach once. AYUAI generates lessons, rewrites sections, and shapes
             every word to sound like you — in seconds, not hours.
           </p>
           <div className="flex items-center justify-center gap-3">
@@ -120,7 +120,7 @@ function ProductPreview() {
             <span className="h-2.5 w-2.5 rounded-full bg-accent/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-ink-muted/40" />
             <span className="ml-4 text-[11px] tracking-widest text-ink-muted">
-              atelier.studio · Korean Lash Lift Masterclass
+              ayuai.com · Korean Lash Lift Masterclass
             </span>
           </div>
 
@@ -269,7 +269,7 @@ function WhyThisExists() {
         <div className="rounded-[14px] border border-accent/30 bg-white px-8 py-7">
           <div className="mb-2 text-[10px] tracking-[0.25em] text-accent">THE DIFFERENCE</div>
           <p className="max-w-[720px] font-serif text-[22px] italic leading-[1.45] text-ink">
-            Atelier is built around your voice. Paste one sample of how you teach — your words
+            AYUAI is built around your voice. Paste one sample of how you teach — your words
             become the pattern every generation works within. You lead. AI follows.
           </p>
         </div>
@@ -310,7 +310,7 @@ function Features() {
           <FeatureCard
             icon={<WaveIcon />}
             title="Train AI to sound like you"
-            text="Paste one writing sample. Atelier analyzes your tone, sentence rhythm, and signature phrases — every rewrite comes back unmistakably in your voice."
+            text="Paste one writing sample. AYUAI analyzes your tone, sentence rhythm, and signature phrases — every rewrite comes back unmistakably in your voice."
           />
           <FeatureCard
             icon={<SparkIcon />}
@@ -342,7 +342,7 @@ function HowItWorks() {
     {
       n: '01',
       title: 'Capture your voice',
-      text: 'Paste a sample of past writing. Atelier analyzes tone, sentence style, and signature phrases.',
+      text: 'Paste a sample of past writing. AYUAI analyzes tone, sentence style, and signature phrases.',
     },
     {
       n: '02',
@@ -424,7 +424,7 @@ function Footer() {
           <div className="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-accent">
             <span className="font-serif italic text-[13px] text-canvas">a</span>
           </div>
-          <span className="ml-2 font-serif text-[14px] tracking-wide">Atelier</span>
+          <span className="ml-2 font-serif text-[14px] tracking-wide">AYUAI</span>
           <span className="ml-1.5 text-[9px] tracking-[0.25em] text-accent">STUDIO</span>
         </div>
         <span className="text-[11px] text-ink-muted">

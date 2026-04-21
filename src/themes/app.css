@@ -1,0 +1,43 @@
+/* App chrome tokens — neutral, minimal SaaS palette.
+ *
+ * These drive the editor UI (Topbar, Sidebar, Canvas shell, modals,
+ * block editor). They DO NOT change when the course theme changes.
+ *
+ * Course output (StudentPreview) opts into the active theme by
+ * wrapping itself in `[data-surface="themed"]`, which redirects
+ * --app-rgb-* to --bp-rgb-* so every Tailwind color class cascades
+ * from the selected theme inside that scope.
+ *
+ * Naming kept compatible with the existing Tailwind token names
+ * (canvas, paper, ink, whisper, etc.) so no component needs to change
+ * class strings. */
+
+:root {
+  /* Neutral SaaS palette (zinc-family + indigo accent) */
+  --app-rgb-canvas: 250 250 250;
+  --app-rgb-paper: 244 244 245;
+  --app-rgb-ink: 10 10 10;
+  --app-rgb-ink-soft: 63 63 70;
+  --app-rgb-ink-muted: 113 113 122;
+  --app-rgb-ink-faint: 161 161 170;
+  --app-rgb-accent: 99 102 241;
+  --app-rgb-accent-deep: 67 56 202;
+  --app-rgb-rose: 239 68 68;
+  --app-rgb-whisper: 228 228 231;
+}
+
+/* Themed surface: any subtree marked `data-surface="themed"` redirects
+ * the app tokens to the active course theme's tokens, so everything
+ * inside re-reads theme colors without changing class names. */
+[data-surface='themed'] {
+  --app-rgb-canvas: var(--bp-rgb-canvas);
+  --app-rgb-paper: var(--bp-rgb-paper);
+  --app-rgb-ink: var(--bp-rgb-ink);
+  --app-rgb-ink-soft: var(--bp-rgb-ink-soft);
+  --app-rgb-ink-muted: var(--bp-rgb-ink-muted);
+  --app-rgb-ink-faint: var(--bp-rgb-ink-faint);
+  --app-rgb-accent: var(--bp-rgb-accent);
+  --app-rgb-accent-deep: var(--bp-rgb-accent-deep);
+  --app-rgb-rose: var(--bp-rgb-rose);
+  --app-rgb-whisper: var(--bp-rgb-whisper);
+}
