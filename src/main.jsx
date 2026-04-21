@@ -10,6 +10,14 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.jsx';
 import './index.css';
+import './themes/beauty-pro.css';
+import { applyTheme } from './themes';
+
+// Beauty Pro is the frozen snapshot of the current aesthetic. Setting it
+// early adds `data-theme="beauty-pro"` to <html> so future theme-aware
+// styles scope correctly. Doesn't change visuals until a different theme
+// is applied.
+applyTheme('beauty-pro');
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

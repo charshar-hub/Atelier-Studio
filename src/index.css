@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Beauty Pro theme variables live in src/themes/beauty-pro.css and are
+ * imported as a side-effect module from src/main.jsx. Do not @import
+ * them here — Vite's CSS pipeline (no postcss-import) leaves @import
+ * statements unresolved in the bundle. */
+
 html,
 body,
 #root {

@@ -1,0 +1,64 @@
+/* Beauty Pro — CSS custom properties snapshot.
+ *
+ * Scoped to both `:root` (so the tokens are always present as defaults)
+ * and `[data-theme="beauty-pro"]` (so the theme can be re-applied
+ * explicitly once other themes exist).
+ *
+ * Currently NO component consumes these variables directly — the existing
+ * Tailwind classes still resolve to their hex values from tailwind.config.js
+ * for bit-identical visual output. The variables are a durable reference
+ * for future theme swaps and for inline styles in theme-aware components. */
+
+:root,
+[data-theme='beauty-pro'] {
+  /* Backgrounds */
+  --bp-color-canvas: #faf6f0;
+  --bp-color-paper: #f3ece1;
+
+  /* Text tiers */
+  --bp-color-ink: #2b2118;
+  --bp-color-ink-soft: #5a4a3f;
+  --bp-color-ink-muted: #8a7666;
+  --bp-color-ink-faint: #8a7666;
+  --bp-color-body-text: #3a2e26;
+
+  /* Accents */
+  --bp-color-accent: #b8936a;
+  --bp-color-accent-deep: #8a6a47;
+  --bp-color-rose: #d4a89a;
+  --bp-color-whisper: #e8dfd2;
+
+  /* Intent surfaces (opacity-baked) */
+  --bp-color-tip-border: rgba(212, 168, 154, 0.3);
+  --bp-color-callout-border: rgba(184, 147, 106, 0.3);
+  --bp-color-callout-surface: rgba(243, 236, 225, 0.6);
+  --bp-color-focus-ring: rgba(184, 147, 106, 0.08);
+  --bp-color-focus-ring-firm: rgba(184, 147, 106, 0.16);
+
+  /* Typography */
+  --bp-font-sans: 'Inter Tight', system-ui, sans-serif;
+  --bp-font-serif: 'Cormorant Garamond', Georgia, serif;
+
+  /* Radii */
+  --bp-radius-sm: 6px;
+  --bp-radius-md: 10px;
+  --bp-radius-lg: 12px;
+  --bp-radius-xl: 14px;
+  --bp-radius-pill: 9999px;
+
+  /* Shadows */
+  --bp-shadow-card: 0 1px 3px rgba(58, 46, 38, 0.04);
+  --bp-shadow-card-subtle: 0 1px 3px rgba(58, 46, 38, 0.03);
+  --bp-shadow-card-hover: 0 4px 16px -8px rgba(58, 46, 38, 0.08);
+  --bp-shadow-popover: 0 8px 28px -12px rgba(58, 46, 38, 0.2);
+  --bp-shadow-toolbar: 0 4px 16px -6px rgba(58, 46, 38, 0.18);
+  --bp-shadow-deep: 0 6px 20px -10px rgba(58, 46, 38, 0.25);
+  --bp-shadow-welcome: 0 2px 10px rgba(58, 46, 38, 0.18);
+  --bp-shadow-focus-ring: 0 0 0 3px rgba(184, 147, 106, 0.08);
+
+  /* Motion */
+  --bp-motion-fade-up: fade-up 260ms ease-out;
+  --bp-motion-slide-right: slide-in-right 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  --bp-motion-slide-left: slide-in-left 320ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  --bp-motion-hover: 150ms ease-out;
+}
